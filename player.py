@@ -1,11 +1,10 @@
 import pygame as pg
 import main, constants, graphics, audio
-from random import randrange
+from random import randrange, choice
 
 
 class Player(pg.sprite.Sprite):
     bullets_max = 20
-    bullets = []
     allBullets = pg.sprite.Group()
 
     def __init__(self):
@@ -76,16 +75,20 @@ class Player(pg.sprite.Sprite):
             if self.power_level == 1 and len(self.allBullets) < self.bullets_max:
                 self.cool_down = pg.time.get_ticks()
                 audio.load_sound("pewpew.wav")
-                new_bullet1 = main.Bullet(self.rect.centerx - 5, self.rect.bottom - self.size[1], graphics.load_image("bullet.png"))
-                new_bullet2 = main.Bullet(self.rect.centerx + 5, self.rect.bottom - self.size[1], graphics.load_image("bullet.png"))
+                new_bullet1 = main.Bullet(self.rect.centerx - 5, self.rect.bottom - self.size[1],
+                                          graphics.load_image("bullet.png"))
+                new_bullet2 = main.Bullet(self.rect.centerx + 5, self.rect.bottom - self.size[1],
+                                          graphics.load_image("bullet.png"))
                 new_bullet1.dy = -10
                 new_bullet2.dy = -10
                 self.allBullets.add(new_bullet1, new_bullet2)
             if self.power_level == 2 and len(self.allBullets) < self.bullets_max:
                 self.cool_down = pg.time.get_ticks()
                 audio.load_sound("pewpew.wav")
-                new_bullet1 = main.Bullet(self.rect.centerx - 5, self.rect.bottom - self.size[1], graphics.load_image("bullet.png"))
-                new_bullet2 = main.Bullet(self.rect.centerx + 5, self.rect.bottom - self.size[1], graphics.load_image("bullet.png"))
+                new_bullet1 = main.Bullet(self.rect.centerx - 5, self.rect.bottom - self.size[1],
+                                          graphics.load_image("bullet.png"))
+                new_bullet2 = main.Bullet(self.rect.centerx + 5, self.rect.bottom - self.size[1],
+                                          graphics.load_image("bullet.png"))
                 missile = main.Bullet(self.rect.centerx, self.rect.y, graphics.load_image("missile.png"))
                 new_bullet1.dy = -10
                 new_bullet2.dy = -10

@@ -1,7 +1,8 @@
 import pygame as pg
-import sys, os, random
-import constants, graphics, audio
-import player
+import player, constants, graphics, audio
+from os import path, environ
+from sys import exit
+from random import choice, randrange, randint
 
 # Configure display surface
 screen = pg.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
@@ -16,7 +17,7 @@ def refresh():
 
 # Font controller
 pg.font.init()
-font = pg.font.Font(os.path.join("fonts", "SPACEBIT.ttf"), constants.FONT_SIZE)
+font = pg.font.Font(path.join("fonts", "SPACEBIT.ttf"), constants.FONT_SIZE)
 
 # Controller logic
 pg.joystick.init()
@@ -29,11 +30,9 @@ except:
 # Record time that program began
 start_time = pg.time.get_ticks()
 
-e_bullet_anim = [graphics.load_image("enemy_shot_a.png"), graphics.load_image("enemy_shot_b.png")]
-
 
 def randomize(scale):
-    return random.choice([-scale, 0, scale])
+    return choice([-scale, 0, scale])
 
 
 def calc_angle(origin, target):
@@ -86,7 +85,7 @@ class PowerUp(pg.sprite.Sprite):
         self.index = 0
         self.image = self.images[self.index]
         self.rect = pg.Rect(0, 0, 40, 40)
-        self.rect.x = random.randrange(40, constants.SCREEN_WIDTH - 40)
+        self.rect.x = randrange(40, constants.SCREEN_WIDTH - 40)
         self.rect.y = 1
 
     def update(self):
@@ -115,9 +114,9 @@ class Stars(pg.sprite.Sprite):
         """ Create the starfield """
         self.stars = []
         for i in range(self.MAX_STARS):
-            star = [random.randrange(0, screen.get_width() - 1),
-                    random.randrange(0, screen.get_height() - 1),
-                    random.choice([1, 2, 3])]
+            star = [randrange(0, screen.get_width() - 1),
+                    randrange(0, screen.get_height() - 1),
+                    choice([1, 2, 3])]
             self.stars.append(star)
 
     def render(self):
@@ -128,8 +127,8 @@ class Stars(pg.sprite.Sprite):
             # it in the top of the screen with a random X coordinate.
             if star[1] >= screen.get_height():
                 star[1] = 0
-                star[0] = random.randrange(0, constants.SCREEN_WIDTH)
-                star[2] = random.choice([1, 2, 3])
+                star[0] = randrange(0, constants.SCREEN_WIDTH)
+                star[2] = choice([1, 2, 3])
 
             # Adjust the star color according to the speed.
             # The slower the star, the darker should be its color.
@@ -147,7 +146,7 @@ class Stars(pg.sprite.Sprite):
 
 class EnemyFighter(pg.sprite.Sprite):
     image = None
-    HEALTH = 3
+    HEALTH = 2
     BULLETS_MAX = 1
     allBullets = pg.sprite.Group()
 
@@ -160,7 +159,7 @@ class EnemyFighter(pg.sprite.Sprite):
         pg.sprite.Sprite.__init__(self)
         self.image = graphics.load_image("fighter.png")
         self.rect = self.image.get_rect()
-        self.rect.x = random.choice(self.spawn_points)
+        self.rect.x = choice(self.spawn_points)
         self.rect.y = 0
         self.dx = 0
         self.dy = 4
@@ -172,7 +171,7 @@ class EnemyFighter(pg.sprite.Sprite):
 
     def respawn(self):
         self.image = graphics.load_image("fighter.png")
-        self.rect.x = random.choice(self.spawn_points)
+        self.rect.x = choice(self.spawn_points)
         self.rect.y = 1
         self.dx = 0
         self.dy = 4
@@ -206,6 +205,9 @@ class EnemyFighter(pg.sprite.Sprite):
         if self.HEALTH <= 0:
             self.die()
 
+        for bullet in self.allBullets:
+            bullet.image = choice([graphics.load_image("enemy_shot_a.png"),graphics.load_image("enemy_shot_b.png")])
+
     def shoot(self, target):
         import math
         new_bullet = Bullet(self.rect.x, self.rect.y, graphics.load_image("enemy_shot.png"))
@@ -226,7 +228,7 @@ class EnemyFighter(pg.sprite.Sprite):
 
 class EnemyCruiser(pg.sprite.Sprite):
     image = None
-    HEALTH = 100
+    HEALTH = 400
 
     allBullets = pg.sprite.Group()
 
@@ -293,7 +295,7 @@ class EnemyCruiser(pg.sprite.Sprite):
             self.image = graphics.load_image("cruiser_hit.png")
             refresh()
             screen.blit(graphics.load_image("explosion.png"),
-                        (self.center[0] + random.randrange(-150, 150), self.center[1] + random.randrange(-150, 150)))
+                        (self.center[0] + randrange(-150, 150), self.center[1] + randrange(-150, 150)))
             audio.load_sound("explode.wav")
             refresh()
             pg.time.delay(100)
@@ -336,7 +338,7 @@ class App:
 
     def on_init(self):
         pg.init()
-        pg.mixer.music.load(os.path.join("sounds", "deadly_opposition.ogg"))
+        pg.mixer.music.load(path.join("sounds", "deadly_opposition.ogg"))
         pg.mixer.music.set_volume(.5)
 
     def on_event(self):
@@ -381,7 +383,7 @@ class App:
         self.all_sprites.add(self.enemies)
         self.all_sprites.add(self.powerups)
 
-        if random.randint(0, 1000) == 1:
+        if randint(0, 1000) == 1:
             self.powerups.add(PowerUp())
             self.all_sprites.add(self.powerups)
 
@@ -467,7 +469,7 @@ class App:
     def on_cleanup(self):
         pg.quit()
         quit()
-        sys.exit()
+        exit()
 
     def title_screen(self):
         title_a = graphics.load_image("title_a.png")
@@ -513,7 +515,7 @@ class App:
             refresh()
             pg.time.delay(10)
         import glob
-        for image in sorted(glob.glob(os.path.join('anims/GAMEOVER', '*.png'))):
+        for image in sorted(glob.glob(path.join('graphics/GAMEOVER', '*.png'))):
             screen.fill(constants.BLACK)
             part = pg.image.load(image).convert()
             screen.blit(part, (SCREEN_CENTER[0] - 250, SCREEN_CENTER[1]))
@@ -558,7 +560,7 @@ class App:
 
 
 if __name__ == "__main__":
-    os.environ['SDL_VIDEO_CENTERED'] = '1'
+    environ['SDL_VIDEO_CENTERED'] = '1'
     game = App()
     game.on_init()
     game.loop()
