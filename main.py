@@ -1,57 +1,53 @@
 import pygame as pg
 import sys, os, random
+import constants, graphics, audio
+import player
 
-# Constants
-SCREEN_WIDTH = 600
-SCREEN_HEIGHT = 1080
-FONT_SIZE = 30
-
-screen = pg.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pg.FULLSCREEN | pg.HWACCEL | pg.HWSURFACE)
+# Configure display surface
+screen = pg.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
 
 # Shortcuts
-SCREEN_CENTER = (SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
+SCREEN_CENTER = (constants.SCREEN_WIDTH / 2, constants.SCREEN_HEIGHT / 2)
 
-# Color key
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
 
-# Load images
-img_background = pg.image.load('background.bmp').convert()
-img_bullet = pg.image.load('bullet.png').convert_alpha()
-img_missile = pg.image.load('missile.png').convert_alpha()
-img_explosion = pg.image.load('explosion.png').convert_alpha()
-img_explosion_final = pg.image.load('explosion_last.png').convert_alpha()
-img_explosion_final = pg.transform.scale2x(img_explosion_final)
-img_player = pg.image.load('ship.png').convert_alpha()
-img_enemy = pg.image.load('enemy.png').convert_alpha()
-img_life = pg.image.load('life.png').convert_alpha()
+def refresh():
+    return pg.display.flip()
 
-# Load sounds
-pg.mixer.pre_init(44100, -16, 2, 2048)
-pg.mixer.init()
-pg.mixer.music.load(os.path.join('star_razer.ogg'))
-snd_shoot = pg.mixer.Sound('pewpew.wav')
-snd_explode = pg.mixer.Sound('explode.wav')
-snd_blow = pg.mixer.Sound('blow_up.wav')
 
-# Load font system
+# Font controller
 pg.font.init()
-font = pg.font.Font("SPACEBIT.ttf", FONT_SIZE)
+font = pg.font.Font(os.path.join("fonts", "SPACEBIT.ttf"), constants.FONT_SIZE)
 
 # Controller logic
 pg.joystick.init()
-js = pg.joystick.Joystick(0)
-js.init()
+try:
+    js = pg.joystick.Joystick(0)
+    js.init()
+except:
+    print("No joystick detected!")
 
+# Record time that program began
+start_time = pg.time.get_ticks()
 
-curr_time = pg.time.get_ticks()
+e_bullet_anim = [graphics.load_image("enemy_shot_a.png"), graphics.load_image("enemy_shot_b.png")]
 
 
 def randomize(scale):
     return random.choice([-scale, 0, scale])
+
+
+def calc_angle(origin, target):
+    import math
+
+    x = origin.rect.x
+    y = origin.rect.y
+
+    x2 = target.rect.x
+    y2 = target.rect.y
+
+    angle = math.atan2(y2 - y, x2 - x)
+
+    return angle
 
 
 class Bullet(pg.sprite.Sprite):
@@ -63,100 +59,57 @@ class Bullet(pg.sprite.Sprite):
         self.rect.center = (x, y)
         self.size = (self.rect.x, self.rect.y)
         self.dx = 0
-        self.velocity = 0
+        self.dy = 0
 
     def update(self):
         x, y = self.rect.center
         x += self.dx
-        y += self.velocity
+        y += self.dy
         self.rect.center = x, y
 
         if y <= 0:
             self.kill()
 
+    def on_hit(self):
+        screen.blit(graphics.load_image("hit.png"), self.rect.center)
+        refresh()
 
-class Player(pg.sprite.Sprite):
-    bullets_max = 20
-    bullets = []
-    allBullets = pg.sprite.Group()
 
+class PowerUp(pg.sprite.Sprite):
     def __init__(self):
         pg.sprite.Sprite.__init__(self)
-        self.image = img_player
-        self.dx = 0
-        self.dy = 0
-        self.speed = 10
-        self.rect = self.image.get_rect()
-        self.size = (self.rect[2], self.rect[3])
-        self.rect.centerx = SCREEN_WIDTH / 2
-        self.rect.bottom = SCREEN_HEIGHT - self.size[1]
-        self.moving = False
-        self.last_x = 0
-        self.last_y = 0
-        self.dead = False
-        self.dead_timer = pg.time.get_ticks()
-        self.cool_down = 0
+        self.images = []
+        self.images.append(graphics.load_image("POWERUP/powerup_a.png"))
+        self.images.append(graphics.load_image("POWERUP/powerup_b.png"))
+        self.images.append(graphics.load_image("POWERUP/powerup_c.png"))
+        self.next_anim_frame = 0
+        self.index = 0
+        self.image = self.images[self.index]
+        self.rect = pg.Rect(0, 0, 40, 40)
+        self.rect.x = random.randrange(40, constants.SCREEN_WIDTH - 40)
+        self.rect.y = 1
 
     def update(self):
-        if self.dead:
-            self.rect.y = SCREEN_HEIGHT + 100
-            if pg.time.get_ticks() - self.dead_timer > 3000:
-                self.dead = False
-                self.image = img_player
-                self.rect.centerx = SCREEN_WIDTH / 2
-                self.rect.bottom = SCREEN_HEIGHT - self.size[1]
+        self.next_anim_frame += 1
+        if self.next_anim_frame >= 10:
+            self.index += 1
+            self.next_anim_frame = 0
+            if self.index >= len(self.images):
+                self.index = 0
 
-        if self.rect.right > SCREEN_WIDTH:
-            self.rect.x = SCREEN_WIDTH - self.size[0]
-            self.dx = 0
-        if self.rect.left < 0:
-            self.rect.x = 0
-            self.dx = 0
-        if self.rect.bottom > SCREEN_HEIGHT and not self.dead:
-            self.rect.bottom = SCREEN_HEIGHT
-            self.dy = 0
+            self.image = self.images[self.index]
 
-        if self.moving:
-            self.rect.x += self.dx
-            self.rect.y += self.dy
-        else:
-            self.dx = 0
-            self.dy = 0
+        self.rect.y += 2
 
-        self.moving = False
-        self.allBullets.update()
-
-    def move_left(self):
-        self.dx = -self.speed
-        self.moving = True
-
-    def move_right(self):
-        self.dx = self.speed
-        self.moving = True
-
-    def move_up(self):
-        self.dy = -self.speed
-        self.moving = True
-
-    def move_down(self):
-        self.dy = self.speed
-        self.moving = True
-
-    def shoot(self):
-        if pg.time.get_ticks() > self.cool_down + 100:
-            if len(self.allBullets) < self.bullets_max:
-                self.cool_down = pg.time.get_ticks()
-                snd_shoot.play()
-                new_bullet1 = Bullet(self.rect.centerx - 5, self.rect.bottom - self.size[1], img_bullet)
-                new_bullet2 = Bullet(self.rect.centerx + 5, self.rect.bottom - self.size[1], img_bullet)
-                new_bullet1.velocity = -5
-                new_bullet2.velocity = -5
-                self.allBullets.add(new_bullet1, new_bullet2)
+    def on_pickup(self):
+        audio.load_sound("powerup.wav")
+        self.kill()
 
 
 class Stars(pg.sprite.Sprite):
     MAX_STARS = 100
-    STAR_SPEED = 2
+
+    # STAR_SPEED = 2
 
     def __init__(self):
         """ Create the starfield """
@@ -175,7 +128,7 @@ class Stars(pg.sprite.Sprite):
             # it in the top of the screen with a random X coordinate.
             if star[1] >= screen.get_height():
                 star[1] = 0
-                star[0] = random.randrange(0, SCREEN_WIDTH)
+                star[0] = random.randrange(0, constants.SCREEN_WIDTH)
                 star[2] = random.choice([1, 2, 3])
 
             # Adjust the star color according to the speed.
@@ -192,65 +145,172 @@ class Stars(pg.sprite.Sprite):
             screen.fill(color, (star[0], star[1], star[2], star[2]))
 
 
-class Enemy(pg.sprite.Sprite):
+class EnemyFighter(pg.sprite.Sprite):
     image = None
+    HEALTH = 3
     BULLETS_MAX = 1
+    allBullets = pg.sprite.Group()
 
     spawn_points = []
-    for i in range(SCREEN_WIDTH - 20):
+    for i in range(constants.SCREEN_WIDTH - 20):
         i += 20
         spawn_points.append(i)
 
     def __init__(self):
         pg.sprite.Sprite.__init__(self)
-        self.image = img_enemy
+        self.image = graphics.load_image("fighter.png")
         self.rect = self.image.get_rect()
         self.rect.x = random.choice(self.spawn_points)
         self.rect.y = 0
         self.dx = 0
-        self.dy = 1
-        self.alive_time = 0
+        self.dy = 4
         self.spawn_time = pg.time.get_ticks()
         self.bullets = pg.sprite.Group()
         self.has_shot = False
+        self.is_hit = False
         self.change = 0
 
     def respawn(self):
-        self.image = img_enemy
+        self.image = graphics.load_image("fighter.png")
         self.rect.x = random.choice(self.spawn_points)
         self.rect.y = 1
         self.dx = 0
-        self.dy = 1
+        self.dy = 4
 
     def movement(self):
-        if self.alive_time > self.spawn_time + 2000:
-            self.dy += .1
-        if self.rect.left <= 0 or self.rect.right >= SCREEN_WIDTH:
+        if self.rect.left <= 0 or self.rect.right >= constants.SCREEN_WIDTH:
             self.kill()
+
         if self.has_shot:
-            if self.rect.centerx > SCREEN_WIDTH / 2:
-                self.change += 1
+            if self.rect.centerx > constants.SCREEN_WIDTH / 2:
+                self.change += .2
             else:
-                self.change -= 1
+                self.change -= .2
+
+        self.rect.x += self.dx + self.change
+        self.rect.y += self.dy
 
     def update(self):
-        self.alive_time += pg.time.get_ticks()
-        if self.rect.y >= SCREEN_HEIGHT:
+        if self.is_hit:
+            self.image = graphics.load_image("fighter_hit.png")
+            self.is_hit = False
+        else:
+            self.image = graphics.load_image("fighter.png")
+
+        if self.rect.y >= constants.SCREEN_HEIGHT:
             self.kill()
             self.respawn()
         else:
             self.movement()
 
-        self.rect.x += self.change
-        self.rect.y += self.dy
+        if self.HEALTH <= 0:
+            self.die()
+
+    def shoot(self, target):
+        import math
+        new_bullet = Bullet(self.rect.x, self.rect.y, graphics.load_image("enemy_shot.png"))
+        new_bullet.dx = 2 * math.cos(calc_angle(self, target)) * 5
+        new_bullet.dy = 2 * math.sin(calc_angle(self, target)) * 5
+        self.allBullets.add(new_bullet)
+        self.has_shot = True
 
     def die(self):
-        snd_explode.play()
-        self.image = img_explosion
+        audio.load_sound("explode.wav")
+        self.image = graphics.load_image("explosion.png")
         screen.blit(self.image, (self.rect.x - 40, self.rect.y - 40))
-        pg.display.update()
-        pg.time.delay(20)
+        refresh()
+        pg.time.delay(10)
+        App.ENEMIES_KILLED += 1
         self.kill()
+
+
+class EnemyCruiser(pg.sprite.Sprite):
+    image = None
+    HEALTH = 100
+
+    allBullets = pg.sprite.Group()
+
+    def __init__(self):
+        pg.sprite.Sprite.__init__(self)
+        self.image = graphics.load_image("cruiser.png")
+        self.rect = self.image.get_rect()
+        self.size = self.image.get_size()
+        self.rect.x = (constants.SCREEN_WIDTH / 2) - (self.size[0] / 2)
+        self.center = (self.rect.x + 100, self.rect.y + 270)
+        self.rect.bottom = 0
+        self.dx = 0
+        self.dy = 1
+        self.last_x = 0
+        self.last_y = 0
+        self.is_hit = False
+        self.charging = False
+        self.t = 0
+        self.beamtime = 0
+        self.next_shot = 0
+
+    def update(self):
+        if self.is_hit:
+            self.image = graphics.load_image("cruiser_hit.png")
+            self.is_hit = False
+        else:
+            self.image = graphics.load_image("cruiser.png")
+
+        self.rect.bottom += self.dy
+
+        if not self.charging and self.rect.bottom == constants.SCREEN_HEIGHT / 2:
+            self.dy = 0
+            self.next_shot += 1
+
+            if self.next_shot == 200:
+                self.charging = True
+
+        if self.HEALTH <= 0:
+            self.die()
+
+        if self.charging:
+            self.t += 1
+            if self.t >= 2:
+                self.fire_beam()
+                self.t = 0
+                self.beamtime += 1
+            elif self.beamtime >= 50:
+                self.next_shot = 0
+                self.beamtime = 0
+                self.charging = False
+        else:
+            self.t = 0
+
+        self.allBullets.update()
+
+    def fire_beam(self):
+        beam = Bullet(self.rect.centerx, self.rect.bottom - 60, graphics.load_image("beam.png"))
+        beam.dy = 4
+        self.allBullets.add(beam)
+        audio.load_sound("firing_beam.wav")
+
+    def die(self):
+        for i in range(30):
+            self.image = graphics.load_image("cruiser_hit.png")
+            refresh()
+            screen.blit(graphics.load_image("explosion.png"),
+                        (self.center[0] + random.randrange(-150, 150), self.center[1] + random.randrange(-150, 150)))
+            audio.load_sound("explode.wav")
+            refresh()
+            pg.time.delay(100)
+            self.image = graphics.load_image("cruiser_hit.png")
+            refresh()
+        self.image = graphics.load_image("explosion_last.png")
+        audio.load_sound("blow_up.wav")
+        pg.time.wait(500)
+        refresh()
+        self.kill()
+
+    def respawn(self):
+        self.image = graphics.load_image("cruiser.png")
+        self.rect.x = (constants.SCREEN_WIDTH / 2) - (self.size[0] / 2)
+        self.rect.bottom = 0
+        self.dx = 0
+        self.dy = 1
 
 
 class App:
@@ -261,27 +321,23 @@ class App:
 
     def __init__(self):
         self._is_running = False
-        self._show_title = True
-        self.image = None
-        self.FPS = 59
-        self.player = Player()
+        self.FPS = 120
+        self.player = player.Player()
+        self.powerups = pg.sprite.Group()
         self.player_lives = 3
         self.stars = Stars()
         self.player_bullets = self.player.allBullets
+        self.fighters = pg.sprite.Group()
+        self.cruiser = pg.sprite.Group()
         self.enemies = pg.sprite.Group()
         self.enemy_bullets = pg.sprite.Group()
         self.all_sprites = pg.sprite.Group()
+        self.spawn_timer = 0
 
     def on_init(self):
         pg.init()
-        self.title_screen()
-        for i in range(self.MAX_ENEMIES):
-            e = Enemy()
-            self.enemies.add(e)
-        self.all_sprites.add(self.player)
-        self.all_sprites.add(self.enemies)
+        pg.mixer.music.load(os.path.join("sounds", "deadly_opposition.ogg"))
         pg.mixer.music.set_volume(.5)
-        pg.mixer.music.play(-1)
 
     def on_event(self):
         for event in pg.event.get():
@@ -322,49 +378,91 @@ class App:
         self.all_sprites.add(self.player_bullets)
         self.all_sprites.add(self.enemy_bullets)
         self.all_sprites.add(self.player)
+        self.all_sprites.add(self.enemies)
+        self.all_sprites.add(self.powerups)
 
-        if self.player.dead:
-            self.enemies.empty()
-        elif len(self.enemies) < self.MAX_ENEMIES:
-            e = Enemy()
-            self.enemies.add(e)
+        if random.randint(0, 1000) == 1:
+            self.powerups.add(PowerUp())
+            self.all_sprites.add(self.powerups)
+
+        if len(self.cruiser) == 0:
+            big_enemy = EnemyCruiser()
+            self.cruiser.add(big_enemy)
+            self.enemies.add(self.cruiser)
             self.all_sprites.add(self.enemies)
 
-        if self.ENEMIES_KILLED > 50:
+        if not self.player.dead and len(self.fighters) < self.MAX_ENEMIES:
+            self.spawn_timer += 1
+            if self.spawn_timer == 5:
+                little_enemy = EnemyFighter()
+                self.fighters.add(little_enemy)
+                self.enemies.add(self.fighters)
+                self.spawn_timer = 0
+
+        if self.player.dead:
+            self.fighters.empty()
+
+        if self.ENEMIES_KILLED > 10:
             self.MAX_ENEMIES += 1
             self.ENEMIES_KILLED = 0
 
-        for target in pg.sprite.groupcollide(self.enemies, self.player_bullets, False, True):
-            if target.rect.y > 20:
-                target.die()
-                self.KILL_COUNT += 1
-                self.ENEMIES_KILLED += 1
+        for enemy in self.fighters:
+            if not self.player.dead:
+                if enemy.rect.bottom >= 300 and not enemy.has_shot:
+                    enemy.shoot(self.player)
+                    self.enemy_bullets.add(enemy.allBullets)
+            if self.player.rect.colliderect(enemy.rect):
+                enemy.HEALTH -= 5
+                self.die()
 
-        for e in self.enemies:
-            if not e.has_shot and e.rect.bottom >= 300:
-                new_bullet = Bullet(e.rect.x, e.rect.y, img_missile)
-                new_bullet.velocity = 6
-                self.enemy_bullets.add(new_bullet)
-                self.all_sprites.add(self.enemy_bullets)
-                e.has_shot = True
-            if not self.player.dead and pg.sprite.spritecollide(self.player, self.enemies, True):
+        for cruiser in self.cruiser:
+            if pg.sprite.collide_mask(self.player, cruiser):
+                cruiser.HEALTH -= 5
                 self.die()
-            if not self.player.dead and pg.sprite.spritecollide(self.player, self.enemy_bullets, True):
+            self.enemy_bullets.add(cruiser.allBullets)
+
+        for bullet in self.enemy_bullets:
+            if not self.player.dead and self.player.rect.colliderect(bullet.rect):
                 self.die()
+
+        for bullet in self.player_bullets:
+            for enemy in self.enemies:
+                if pg.sprite.collide_mask(bullet, enemy):
+                    bullet.on_hit()
+                    enemy.is_hit = True
+                    refresh()
+                    audio.load_sound("hit.wav")
+                    enemy.HEALTH -= 1
+                    bullet.kill()
+
+        for powerup in self.powerups:
+            if pg.sprite.collide_mask(powerup, self.player):
+                powerup.on_pickup()
+                self.player.power_level += 1
+
+        for sprite in self.all_sprites:
+            if 0 > sprite.rect.x > constants.SCREEN_WIDTH:
+                sprite.kill()
+            if 0 > sprite.rect.y > constants.SCREEN_HEIGHT:
+                sprite.kill()
 
         self.all_sprites.update()
         self.clock.tick(self.FPS)
 
     def on_render(self):
-        screen.blit(img_background, (0, 0))
+        screen.blit(graphics.load_image("background.bmp"), (0, 0))
         self.stars.render()
-        self.all_sprites.draw(screen)
-        score = font.render("ENEMIES KILLED: " + str(self.KILL_COUNT), True, WHITE)
-        lives = [(SCREEN_WIDTH - img_life.get_size()[0], SCREEN_HEIGHT - 40), (SCREEN_WIDTH - img_life.get_size()[0]*2, SCREEN_HEIGHT - 40), (SCREEN_WIDTH - img_life.get_size()[0]*3, SCREEN_HEIGHT - 40)]
-        screen.blit(score, (20, SCREEN_HEIGHT - 40))
+        score = font.render("ENEMIES KILLED: " + str(self.KILL_COUNT), True, constants.WHITE)
+        lives = [(constants.SCREEN_WIDTH - graphics.load_image("life.png").get_size()[0], constants.SCREEN_HEIGHT - 40),
+                 (constants.SCREEN_WIDTH - graphics.load_image("life.png").get_size()[0] * 2,
+                  constants.SCREEN_HEIGHT - 40), (
+                     constants.SCREEN_WIDTH - graphics.load_image("life.png").get_size()[0] * 3,
+                     constants.SCREEN_HEIGHT - 40)]
+        screen.blit(score, (20, constants.SCREEN_HEIGHT - 40))
         for i in range(self.player_lives):
-            screen.blit(img_life, lives[i])
-        pg.display.flip()
+            screen.blit(graphics.load_image("life.png"), lives[i])
+        self.all_sprites.draw(screen)
+        refresh()
 
     def on_cleanup(self):
         pg.quit()
@@ -372,19 +470,19 @@ class App:
         sys.exit()
 
     def title_screen(self):
-        title_a = pg.image.load('title_a.png').convert_alpha()
-        title_b = pg.image.load('title_b.png').convert_alpha()
+        title_a = graphics.load_image("title_a.png")
+        title_b = graphics.load_image("title_b.png")
         title_size = title_a.get_size()
         steps = int(title_size[0])
         for i in range(steps + 36):
-            screen.fill(BLUE)
+            screen.fill(constants.BLUE)
             screen.blit(title_a, (-title_size[0] + i, 100))
-            screen.blit(title_b, (SCREEN_WIDTH - i, 100))
-            pg.display.update()
-        snd_blow.play()
-        menu = font.render("PRESS ENTER", True, WHITE)
+            screen.blit(title_b, (constants.SCREEN_WIDTH - i, 100))
+            refresh()
+        audio.load_sound("blow_up.wav")
+        menu = font.render("PRESS ENTER", True, constants.WHITE)
         screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1]))
-        pg.display.flip()
+        refresh()
 
         while True:
             e = pg.event.poll()
@@ -394,44 +492,65 @@ class App:
 
         for i in range(255):
             screen.fill((255 - i, 255 - i, 255 - i))
-            pg.display.flip()
+            refresh()
 
-        begin = font.render("GET READY", True, WHITE)
+        text = font.render("GET READY", True, constants.WHITE)
         count_list = ['5', '4', '3', '2', '1', 'GO!']
         for i in range(6):
-            countdown = font.render(count_list[i], True, WHITE)
-            screen.fill(BLACK)
-            screen.blit(begin, (SCREEN_CENTER[0] - begin.get_width() / 2, SCREEN_CENTER[1]))
+            countdown = font.render(count_list[i], True, constants.WHITE)
+            screen.fill(constants.BLACK)
+            screen.blit(text, (SCREEN_CENTER[0] - text.get_width() / 2, SCREEN_CENTER[1]))
             screen.blit(countdown, (SCREEN_CENTER[0] - countdown.get_width() / 2, SCREEN_CENTER[1] + 30))
-            pg.display.flip()
+            refresh()
             pg.time.wait(1000)
         self._is_running = True
 
+    def game_over(self):
+        pg.mixer.music.stop()
+        screen.fill((255, 255, 255))
+        for i in range(255):
+            screen.fill((255 - i, 255 - i, 255 - i))
+            refresh()
+            pg.time.delay(10)
+        import glob
+        for image in sorted(glob.glob(os.path.join('anims/GAMEOVER', '*.png'))):
+            screen.fill(constants.BLACK)
+            part = pg.image.load(image).convert()
+            screen.blit(part, (SCREEN_CENTER[0] - 250, SCREEN_CENTER[1]))
+            refresh()
+            pg.time.delay(100)
+        refresh()
+        pg.time.wait(2000)
+
     def loop(self):
+        self.title_screen()
+        pg.mixer.music.play(-1)
         while self._is_running and self.player_lives > 0:
             self.on_event()
             self.update_loop()
             self.on_render()
 
+        self.game_over()
+
     def die(self):
         self.player.last_x = self.player.rect.x
         self.player.last_y = self.player.rect.y
-        self.player.image = img_explosion
-        snd_blow.play()
-        screen.blit(img_explosion_final, (self.player.last_x - 200, self.player.last_y - 200))
-        snd_explode.play()
+        self.player.image = graphics.load_image("explosion.png")
+        audio.load_sound("blow_up.wav")
+        screen.blit(graphics.load_image("explosion_last.png"), (self.player.last_x - 100, self.player.last_y - 200))
+        audio.load_sound("explode.wav")
         for i in range(100):
             new_x = randomize(i) - 50
             new_y = randomize(i) - 50
-            screen.blit(pg.transform.scale(img_explosion, (101 - i, 101 - i)),
+            screen.blit(pg.transform.scale(graphics.load_image("explosion.png"), (101 - i, 101 - i)),
                         ((self.player.last_x + new_x) - i, (self.player.last_y + new_y) + i))
-            screen.blit(pg.transform.scale(img_explosion, (101 - i, 101 - i)),
+            screen.blit(pg.transform.scale(graphics.load_image("explosion.png"), (101 - i, 101 - i)),
                         ((self.player.last_x + new_x) + i, (self.player.last_y + new_y) - i))
-            screen.blit(pg.transform.scale(img_explosion, (101 - i, 101 - i)),
+            screen.blit(pg.transform.scale(graphics.load_image("explosion.png"), (101 - i, 101 - i)),
                         ((self.player.last_x + new_x) - i, (self.player.last_y + new_y) - i))
-            screen.blit(pg.transform.scale(img_explosion, (101 - i, 101 - i)),
+            screen.blit(pg.transform.scale(graphics.load_image("explosion.png"), (101 - i, 101 - i)),
                         ((self.player.last_x + new_x) + i, (self.player.last_y + new_y) + i))
-            pg.display.update()
+            refresh()
 
         self.player.dead = True
         self.player.dead_timer = pg.time.get_ticks()
