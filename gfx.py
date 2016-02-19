@@ -18,7 +18,8 @@ def load_image(file):
 # Image Library
 img_background = pg.image.load(path.join("graphics", "background.bmp")).convert()
 img_bullet = pg.image.load(path.join("graphics", "bullet.png")).convert_alpha()
-img_bullet_upgraded = pg.image.load(path.join("graphics", "bullet_2.png")).convert_alpha()
+img_bullet_2 = pg.image.load(path.join("graphics", "bullet_2.png")).convert_alpha()
+img_bullet_3 = pg.image.load(path.join("graphics", "bullet_3.png")).convert_alpha()
 img_missile = pg.image.load(path.join("graphics", "missile.png")).convert_alpha()
 img_explosion = pg.image.load(path.join("graphics", "explosion.png")).convert_alpha()
 img_explosion_final = pg.image.load(path.join("graphics", "explosion_last.png")).convert_alpha()
@@ -40,6 +41,7 @@ img_title_background = pg.image.load(path.join("graphics", "title_background.png
 img_title_background = pg.transform.scale(img_title_background, (constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
 img_title_a = pg.image.load(path.join("graphics", "title_a.png")).convert_alpha()
 img_title_b = pg.image.load(path.join("graphics", "title_b.png")).convert_alpha()
+img_title_whole = pg.image.load(path.join("graphics", "title_whole.png")).convert_alpha()
 img_enemy_shot_a = pg.image.load(path.join("graphics", "enemy_shot_a.png")).convert_alpha()
 img_enemy_shot_b = pg.image.load(path.join("graphics", "enemy_shot_b.png")).convert_alpha()
 

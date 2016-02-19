@@ -129,17 +129,17 @@ class Player(pg.sprite.Sprite):
                 new_bullet1.dy = -15
                 new_bullet2.dy = -15
                 self.allBullets.add(new_bullet1, new_bullet2)
-            elif self.power_level >= 2 and (pg.time.get_ticks() > self.cool_down + 20):
+            elif self.power_level == 2 and (pg.time.get_ticks() > self.cool_down + 20):
                 self.t += 1
                 self.cool_down = pg.time.get_ticks()
                 new_bullet1 = main.Bullet(self.rect.centerx - 10, self.rect.bottom - self.size[1],
-                                          gfx.img_bullet_upgraded)
+                                          gfx.img_bullet_2)
                 new_bullet2 = main.Bullet(self.rect.centerx + 10, self.rect.bottom - self.size[1],
-                                          gfx.img_bullet_upgraded)
+                                          gfx.img_bullet_2)
                 new_bullet3 = main.Bullet(self.rect.centerx - 25, self.rect.bottom - self.size[1],
-                                          gfx.img_bullet_upgraded)
+                                          gfx.img_bullet_2)
                 new_bullet4 = main.Bullet(self.rect.centerx + 25, self.rect.bottom - self.size[1],
-                                          gfx.img_bullet_upgraded)
+                                          gfx.img_bullet_2)
 
                 new_bullet1.dy = -10
                 new_bullet2.dy = -10
@@ -155,6 +155,18 @@ class Player(pg.sprite.Sprite):
                     self.allBullets.add(new_bullet4)
                     snd.load_sound("pewpew2.wav")
                 if self.t > 5:
+                    self.t = 0
+            elif self.power_level >= 3 and (pg.time.get_ticks() > self.cool_down + 20):
+                self.t += 1
+                self.cool_down = pg.time.get_ticks()
+
+                new_bullet = main.Bullet(self.rect.centerx - 80, self.rect.y, gfx.img_bullet_3)
+                new_bullet.dy = -20
+                new_bullet.image = pg.transform.scale(new_bullet.image, (200, 100))
+
+                if self.t >= 4:
+                    self.allBullets.add(new_bullet)
+                    snd.load_sound("pewpew3.wav")
                     self.t = 0
 
     def die(self):

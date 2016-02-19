@@ -119,7 +119,7 @@ class Stars(pg.sprite.Sprite):
 
 class EnemyFighter(pg.sprite.Sprite):
     image = None
-    HEALTH = 4
+    HEALTH = 2
     BULLETS_MAX = 1
     allBullets = pg.sprite.Group()
     spawn_areas = [50, 100, 200, 300, 400, 500, 600, 700, 750]
@@ -252,7 +252,7 @@ class EnemyFrigate(pg.sprite.Sprite):
 
 class EnemyCruiser(pg.sprite.Sprite):
     image = None
-    HEALTH = 400
+    HEALTH = 500
 
     allBullets = pg.sprite.Group()
 
@@ -427,6 +427,7 @@ class GameControl:
             self.time = round(self.t1 - self.t0, 1)
 
         if self.time > 10 and not self.player.arrive:
+            self.started = False
             if len(self.cruiser) < 1 and self.time >= 120:
                 snd.play_song("deadly_opposition.ogg")
                 big_enemy = EnemyCruiser()
@@ -552,6 +553,7 @@ class GameControl:
 
     def title_screen(self):
         while True:
+            scroll = 0
             title_a = gfx.img_title_a
             title_b = gfx.img_title_b
             title_size = title_a.get_size()
@@ -559,28 +561,38 @@ class GameControl:
             for i in range(steps + 69):
                 gfx.screen.blit(gfx.img_title_background, (0, 0))
                 gfx.screen.blit(gfx.img_title_stars, (0, 100))
-                gfx.screen.blit(title_a, (-title_size[0] + i + i, 100))
-                gfx.screen.blit(title_b, (constants.SCREEN_WIDTH - i - i, 101))
-                helper_functions.refresh()
+                pg.display.update(gfx.screen.blit(title_a, (-title_size[0] + i + i, 100)))
+                pg.display.update(gfx.screen.blit(title_b, (constants.SCREEN_WIDTH - i - i, 100)))
+                pg.display.flip()
             snd.load_sound("blow_up.wav")
             snd.play_song("title_song.ogg")
-            break
 
-        while True:
             while True:
                 e = pg.event.poll()
                 if e.type == pg.KEYDOWN:
                     if e.key == pg.K_RETURN:
                         snd.load_sound("explode.wav")
                         break
-                menu = font.render("PRESS ENTER", True, constants.WHITE)
-                gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1] - 100))
-                helper_functions.refresh()
-                pg.time.wait(100)
-                menu = font.render("PRESS ENTER", True, constants.BLACK)
-                gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1] - 100))
-                helper_functions.refresh()
-                pg.time.wait(100)
+
+                if scroll <= constants.SCREEN_WIDTH:
+                    scroll += 4
+                    gfx.screen.blit(gfx.img_title_stars, (scroll, 100))
+                    gfx.screen.blit(gfx.img_title_stars, (-constants.SCREEN_WIDTH+scroll, 100))
+                else:
+                    scroll = 0
+
+                for i in range(60):
+                    if i <= 30:
+                        menu = font.render("PRESS ENTER", True, constants.WHITE)
+                        gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1] - 100))
+                        helper_functions.refresh()
+                    elif i >= 30:
+                        menu = font.render("PRESS ENTER", True, constants.BLACK)
+                        gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1] - 100))
+
+                        helper_functions.refresh()
+                    gfx.screen.blit(gfx.img_title_whole, (SCREEN_CENTER[0] - gfx.img_title_whole.get_width()/2, 100))
+
             break
 
         while True:
@@ -606,6 +618,7 @@ class GameControl:
 
     def game_over(self):
         pg.mixer.music.stop()
+        snd.load_sound("music/death.ogg")
         gfx.screen.fill((255, 255, 255))
         for i in range(255):
             gfx.screen.fill((255 - i, 255 - i, 255 - i))
