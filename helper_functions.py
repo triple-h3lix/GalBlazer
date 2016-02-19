@@ -1,11 +1,14 @@
+from random import choice
+import gfx
+
 import pygame as pg
 
-from math import atan2
-from random import choice
 
 def refresh():
+    gfx.screen.blit(gfx.scanlines, (0, 0))
     return pg.display.update()
-	
+
+
 def randomize(scale):
     return choice([-scale, 0, scale])
 

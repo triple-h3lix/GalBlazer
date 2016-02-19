@@ -1,5 +1,5 @@
 import pygame as pg
-import os
+from os import path
 
 pg.mixer.pre_init(44100, -16, 2, 2048)
 pg.mixer.init()
@@ -12,5 +12,12 @@ pg.mixer.init()
 
 
 def load_sound(FILENAME):
-    sound = pg.mixer.Sound(os.path.join("sounds/", FILENAME))
+
+    sound = pg.mixer.Sound(path.join("sounds/", FILENAME))
     sound.play()
+
+def play_song(FILENAME):
+
+    pg.mixer.music.stop()
+    pg.mixer.music.load(path.join("sounds/", "music/", str(FILENAME)))
+    pg.mixer.music.play(-1)

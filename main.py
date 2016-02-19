@@ -52,8 +52,8 @@ class Bullet(pg.sprite.Sprite):
             self.kill()
 
     def on_hit(self):
-        gfx.screen.blit(gfx.img_hit, (self.rect.centerx - gfx.img_hit.get_width() / 2, self.rect.y))
-        helper_functions.refresh()
+        s = gfx.screen.blit(gfx.img_hit, (self.rect.centerx - gfx.img_hit.get_width() / 2, self.rect.y))
+        pg.display.update(s)
 
 
 class PowerUp(pg.sprite.Sprite):
@@ -120,62 +120,54 @@ class Stars(pg.sprite.Sprite):
 class EnemyFighter(pg.sprite.Sprite):
     image = None
     HEALTH = 4
-    BULLETS_MAX = 3
+    BULLETS_MAX = 1
     allBullets = pg.sprite.Group()
-
-    spawn_points = []
-    spawn_points.append(100)
-    spawn_points.append(200)
-    spawn_points.append(300)
-    spawn_points.append(400)
-    spawn_points.append(500)
+    spawn_areas = [50, 100, 200, 300, 400, 500, 600, 700, 750]
 
     def __init__(self):
         pg.sprite.Sprite.__init__(self)
         self.image = gfx.img_fighter
         self.rect = self.image.get_rect()
-        self.rect.x = choice(self.spawn_points)
+        self.rect.x = choice(self.spawn_areas)
         self.rect.y = 0
         self.dx = 0
-        self.dy = 4
+        self.dy = 3
         self.spawn_time = pg.time.get_ticks()
         self.bullets = pg.sprite.Group()
         self.has_shot = False
-        self.next_shot = 0
         self.is_hit = False
         self.change = 0
         self.angle = 0
 
     def movement(self):
         if self.rect.bottom > 300:
-            self.dy = 1
+            self.dy = 2
 
         if self.rect.left <= 0 or self.rect.right >= constants.SCREEN_WIDTH:
             self.kill()
 
         if self.has_shot:
-            self.dy = 5
+            self.dy = 4
             if self.rect.centerx > constants.SCREEN_WIDTH / 2:
-                self.change += .2
+                self.change += .1
             else:
-                self.change -= .2
+                self.change -= .1
 
         self.rect.x += self.dx + self.change
         self.rect.y += self.dy
 
         self.angle += math.degrees(self.change) / 180
-        self.image = pg.transform.rotate(gfx.img_fighter, self.angle)
 
     def update(self):
         if self.is_hit:
             self.image = gfx.img_fighter_hit
+            pg.display.update(self.rect)
             self.is_hit = False
         else:
             self.image = gfx.img_fighter
 
         if self.rect.y >= constants.SCREEN_HEIGHT:
             self.kill()
-            self.respawn()
         else:
             self.movement()
 
@@ -184,6 +176,8 @@ class EnemyFighter(pg.sprite.Sprite):
 
         for bullet in self.allBullets:
             bullet.image = choice([gfx.img_enemy_shot_a, gfx.img_enemy_shot_b])
+
+        self.image = pg.transform.rotate(self.image, self.angle)
 
     def shoot(self, target):
         import math
@@ -199,8 +193,8 @@ class EnemyFighter(pg.sprite.Sprite):
     def die(self):
         snd.load_sound("explode.wav")
         self.image = gfx.img_explosion
-        gfx.screen.blit(self.image, (self.rect.x - 40, self.rect.y - 40))
-        helper_functions.refresh()
+        s = gfx.screen.blit(self.image, (self.rect.x - 40, self.rect.y - 40))
+        pg.display.update(s)
         pg.time.delay(10)
         self.kill()
 
@@ -223,8 +217,6 @@ class EnemyFrigate(pg.sprite.Sprite):
         self.rect.bottom = 0
         self.dx = 1
         self.dy = 0
-        self.last_x = 0
-        self.last_y = 0
         self.is_hit = False
 
     def update(self):
@@ -250,9 +242,10 @@ class EnemyFrigate(pg.sprite.Sprite):
 
     def die(self):
         snd.load_sound("explode.wav")
-        self.image = gfx.img_explosion
-        gfx.screen.blit(self.image, (self.rect.x - 40, self.rect.y - 40))
-        helper_functions.refresh()
+        self.image = gfx.img_explosion_final
+        self.image = pg.transform.scale(self.image, (300, 300))
+        s = gfx.screen.blit(self.image, (self.rect.x - 50, self.rect.y - 120))
+        pg.display.update(s)
         pg.time.delay(10)
         self.kill()
 
@@ -273,14 +266,14 @@ class EnemyCruiser(pg.sprite.Sprite):
         self.rect.bottom = 0
         self.dx = 0
         self.dy = 1
-        self.last_x = 0
-        self.last_y = 0
         self.is_hit = False
         self.charging = False
+        self.firing = False
         self.has_shot = False
-        self.t = 0
-        self.beamtime = 0
         self.next_shot = 0
+        self.charge = 0
+        self.duration = 0
+        self.beamtime = 0
 
     def update(self):
         if self.is_hit:
@@ -291,63 +284,71 @@ class EnemyCruiser(pg.sprite.Sprite):
         else:
             self.image = gfx.img_cruiser
 
-        if not self.charging and self.rect.bottom == constants.SCREEN_HEIGHT / 2:
+        if not (self.charging or self.firing) and self.rect.bottom == constants.SCREEN_HEIGHT / 2:
             self.dy = 0
+            self.charge = 0
+            self.duration = 0
             self.next_shot += 1
-            if self.next_shot >= 200:
+            if self.next_shot >= 500:
                 self.charging = True
+                self.next_shot = 0
 
         if self.charging:
+            self.firing = False
+            self.charge += 1
+            snd.load_sound("charging.wav")
+            if self.charge >= 180:
+                self.firing = True
+        if self.firing:
+            self.charging = False
+
             self.image = gfx.img_cruiser_firing
-            self.t += 1
-            if self.t >= 5:
+            self.beamtime += 1
+            if self.beamtime >= 5:
+                self.duration += 1
                 self.fire_beam()
-                self.t = 0
-                self.beamtime += 1
-                if self.beamtime >= 50:
-                    self.next_shot = 0
-                    self.beamtime = 0
-                    self.charging = False
+                self.beamtime = 0
+                if self.duration >= 100:
+                    self.image = gfx.img_cruiser
+                    self.firing = False
+
+        if self.charging:
+            print("charging")
+        if self.firing:
+            print("firing")
 
         if self.rect.left > 0 and self.rect.right < constants.SCREEN_WIDTH:
             self.rect.centerx += self.dx
         self.rect.bottom += self.dy
 
     def fire_beam(self):
+
         beam = Bullet(self.rect.centerx, self.rect.bottom - 60, gfx.img_beam)
         beam.dy = 8
         self.allBullets.add(beam)
         snd.load_sound("firing_beam.wav")
-        gfx.screen.blit(gfx.img_beam_arc,
-                        (self.rect.centerx - (gfx.img_beam_arc.get_width() / 2), self.rect.bottom - 100))
-        helper_functions.refresh()
+        s = gfx.screen.blit(gfx.img_beam_arc,
+                            (self.rect.centerx - (gfx.img_beam_arc.get_width() / 2), self.rect.bottom - 100))
+        pg.display.update(s)
         self.has_shot = True
 
     def die(self):
-        for i in range(30):
-            self.image = gfx.img_cruiser_hit
-            helper_functions.refresh()
-            gfx.screen.blit(gfx.img_explosion,
-                            (self.center[0] + randrange(-150, 150), self.center[1] + randrange(-150, 150)))
+        for i in range(9):
+            pg.display.update(
+                    gfx.explosion(self.center[0] + randrange(-100, 100, 20), self.center[1] + randrange(-100, 100, 20)))
             snd.load_sound("explode.wav")
-            helper_functions.refresh()
-        self.image = gfx.load_image("explosion_last.png")
+            pg.time.delay(20)
+        self.image = pg.transform.scale2x(gfx.load_image("explosion_last.png"))
         snd.load_sound("blow_up.wav")
-        pg.time.wait(500)
         helper_functions.refresh()
+        pg.time.wait(100)
+        snd.play_song("gravitational_constant.ogg")
         self.kill()
-
-    def respawn(self):
-        self.image = gfx.img_cruiser
-        self.rect.x = (constants.SCREEN_WIDTH / 2) - (self.size[0] / 2)
-        self.rect.bottom = 0
-        self.dx = 0
-        self.dy = 1
 
 
 class GameControl:
     clock = 0
-    MAX_ENEMIES = 2
+    MAX_ENEMIES = 5
     ENEMIES_KILLED = 0
     KILL_COUNT = 0
     SCORE = 0
@@ -358,7 +359,7 @@ class GameControl:
         self.t0 = time()
         self.t1 = 0
         self.time = 0
-        self.FPS = 40
+        self.FPS = 60
         self.player = player.Player()
         self.powerups = pg.sprite.Group()
         self.drop_chance = 5
@@ -368,7 +369,6 @@ class GameControl:
         self.player_bullets = self.player.allBullets
         self.fighters = pg.sprite.Group()
         self.frigates = pg.sprite.Group()
-        self.spawn_areas = [100, 200, 300, 400]
         self.cruiser = pg.sprite.Group()
         self.enemies = pg.sprite.Group()
         self.enemy_bullets = pg.sprite.Group()
@@ -380,6 +380,22 @@ class GameControl:
         self.clock = pg.time.Clock()
 
     def on_event(self):
+        pressed = pg.key.get_pressed()
+        if not self.player.dead:
+            if pressed[pg.K_UP]:
+                self.player.move_up()
+            if pressed[pg.K_DOWN]:
+                self.player.move_down()
+            if pressed[pg.K_LEFT]:
+                self.player.move_left()
+            if pressed[pg.K_RIGHT]:
+                self.player.move_right()
+            if pressed[pg.K_SPACE]:
+                self.player.shoot()
+        if pressed[pg.K_ESCAPE]:
+            self._is_running = False
+
+        # These handle input from a controller
         for event in pg.event.get():
             if not self.player.dead:
                 if event.type == pg.JOYHATMOTION:
@@ -399,21 +415,6 @@ class GameControl:
                     if js.get_button(0):
                         self.player.shoot()
 
-        pressed = pg.key.get_pressed()
-        if not self.player.dead:
-            if pressed[pg.K_UP]:
-                self.player.move_up()
-            if pressed[pg.K_DOWN]:
-                self.player.move_down()
-            if pressed[pg.K_LEFT]:
-                self.player.move_left()
-            if pressed[pg.K_RIGHT]:
-                self.player.move_right()
-            if pressed[pg.K_SPACE]:
-                self.player.shoot()
-        if pressed[pg.K_ESCAPE]:
-            self._is_running = False
-
     def update_loop(self):
         self.all_sprites.add(self.player_bullets)
         self.all_sprites.add(self.enemy_bullets)
@@ -426,26 +427,28 @@ class GameControl:
             self.time = round(self.t1 - self.t0, 1)
 
         if self.time > 10 and not self.player.arrive:
-            if len(self.cruiser) == 0 and self.KILL_COUNT == 5:
+            if len(self.cruiser) < 1 and self.time >= 120:
+                snd.play_song("deadly_opposition.ogg")
                 big_enemy = EnemyCruiser()
                 self.cruiser.add(big_enemy)
                 self.enemies.add(self.cruiser)
+                self.time = 0
 
             if not self.player.dead and len(self.fighters) < self.MAX_ENEMIES:
-                self.spawn_timer += 1
-                if self.spawn_timer == 10:
-                    little_enemy = EnemyFighter()
-                    little_enemy.rect.x == choice(self.spawn_areas)
-                    self.fighters.add(little_enemy)
-                    self.enemies.add(self.fighters)
-                    self.spawn_timer = 0
+                if len(self.cruiser) == 0:
+                    self.spawn_timer += 1
+                    if self.spawn_timer >= 10:
+                        little_enemy = EnemyFighter()
+                        self.fighters.add(little_enemy)
+                        self.enemies.add(self.fighters)
+                        self.spawn_timer = 0
 
-            if not self.player.dead and len(self.frigates) < 1:
-                frigate = EnemyFrigate()
-                frigate.rect.y = choice(self.spawn_areas)
-                frigate.rect.right = 0
-                self.frigates.add(frigate)
-                self.enemies.add(self.frigates)
+                    if len(self.frigates) < 1:
+                        frigate = EnemyFrigate()
+                        frigate.rect.y = choice([50, 100, 150, 200, 250, 300])
+                        frigate.rect.right = 0
+                        self.frigates.add(frigate)
+                        self.enemies.add(self.frigates)
 
             if self.ENEMIES_KILLED > 25:
                 self.MAX_ENEMIES += 1
@@ -454,7 +457,7 @@ class GameControl:
             for fighter in self.fighters:
                 if not self.player.dead and not fighter.has_shot:
                     if abs(self.player.rect.y - fighter.rect.bottom <= 300) and abs(
-                                            self.player.rect.centerx - fighter.rect.centerx <= 300):
+                                            self.player.rect.centerx - fighter.rect.centerx <= 500):
                         fighter.shoot(self.player)
                         self.enemy_bullets.add(fighter.allBullets)
                 if self.player.rect.colliderect(fighter.rect):
@@ -471,11 +474,11 @@ class GameControl:
 
             for cruiser in self.cruiser:
                 if self.player.dead:
-                    cruiser.charge_timer = 0
+                    cruiser.allBullets.empty()
                 self.enemy_bullets.add(cruiser.allBullets)
 
             for enemy in self.enemies:
-                if pg.sprite.collide_mask(self.player, enemy):
+                if pg.sprite.collide_mask(self.player, enemy) and not self.player.invulnerable:
                     enemy.HEALTH -= 10
                     self.player.die()
                     self.player_lives -= 1
@@ -501,6 +504,14 @@ class GameControl:
                             pwr_up.rect = enemy.rect
                             if randint(1, 20) == self.drop_chance:
                                 self.powerups.add(pwr_up)
+
+            for beam in EnemyCruiser.allBullets:
+                for fighter in self.fighters:
+                    if pg.sprite.collide_mask(beam, fighter):
+                        fighter.die()
+                for frigate in self.frigates:
+                    if pg.sprite.collide_mask(beam, frigate):
+                        frigate.die()
 
             for powerup in self.powerups:
                 if pg.sprite.collide_mask(powerup, self.player):
@@ -531,7 +542,7 @@ class GameControl:
         gfx.screen.blit(score, (20, constants.SCREEN_HEIGHT - 50))
         for i in range(self.player_lives):
             gfx.screen.blit(gfx.img_life, lives[i])
-        self.all_sprites.draw(gfx.screen)
+        pg.display.update(self.all_sprites.draw(gfx.screen))
         helper_functions.refresh()
 
     def on_cleanup(self):
@@ -540,20 +551,20 @@ class GameControl:
         exit()
 
     def title_screen(self):
-        pg.mixer.music.load(path.join("sounds", "music", "title_song.ogg"))
-        pg.mixer.music.set_volume(.5)
-        pg.mixer.music.play(-1)
-        title_a = gfx.img_title_a
-        title_b = gfx.img_title_b
-        title_size = title_a.get_size()
-        steps = int(title_size[0])
-        for i in range(steps + 36):
-            gfx.screen.blit(gfx.img_title_background, (0, 0))
-            gfx.screen.blit(gfx.img_title_stars, (0, 100))
-            gfx.screen.blit(title_a, (-title_size[0] + i, 100))
-            gfx.screen.blit(title_b, (constants.SCREEN_WIDTH - i, 100))
-            helper_functions.refresh()
-        snd.load_sound("blow_up.wav")
+        while True:
+            title_a = gfx.img_title_a
+            title_b = gfx.img_title_b
+            title_size = title_a.get_size()
+            steps = int(title_size[0] / 2)
+            for i in range(steps + 69):
+                gfx.screen.blit(gfx.img_title_background, (0, 0))
+                gfx.screen.blit(gfx.img_title_stars, (0, 100))
+                gfx.screen.blit(title_a, (-title_size[0] + i + i, 100))
+                gfx.screen.blit(title_b, (constants.SCREEN_WIDTH - i - i, 101))
+                helper_functions.refresh()
+            snd.load_sound("blow_up.wav")
+            snd.play_song("title_song.ogg")
+            break
 
         while True:
             while True:
@@ -562,31 +573,35 @@ class GameControl:
                     if e.key == pg.K_RETURN:
                         snd.load_sound("explode.wav")
                         break
-
                 menu = font.render("PRESS ENTER", True, constants.WHITE)
-                gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1]))
+                gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1] - 100))
                 helper_functions.refresh()
                 pg.time.wait(100)
                 menu = font.render("PRESS ENTER", True, constants.BLACK)
-                gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1]))
+                gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1] - 100))
                 helper_functions.refresh()
                 pg.time.wait(100)
-
             break
 
-        for i in range(255):
-            gfx.screen.fill((255 - i, 255 - i, 255 - i))
-            helper_functions.refresh()
+        while True:
+            for i in range(255):
+                gfx.screen.fill((255 - i, 255 - i, 255 - i))
+                helper_functions.refresh()
+            break
 
-        text = font.render("GET READY", True, constants.WHITE)
-        count_list = ["5", "4", "3", "2", "1", "GO!"]
-        for i in range(6):
-            countdown = font.render(count_list[i], True, constants.WHITE)
-            gfx.screen.fill(constants.BLACK)
-            gfx.screen.blit(text, (SCREEN_CENTER[0] - text.get_width() / 2, SCREEN_CENTER[1]))
-            gfx.screen.blit(countdown, (SCREEN_CENTER[0] - countdown.get_width() / 2, SCREEN_CENTER[1] + 30))
-            helper_functions.refresh()
-            pg.time.wait(1000)
+        while True:
+            text = font.render("GET READY", True, constants.WHITE)
+            count_list = ["5", "4", "3", "2", "1", "GO!"]
+            for i in range(6):
+                countdown = font.render(count_list[i], True, constants.WHITE)
+                gfx.screen.fill(constants.BLACK)
+                gfx.screen.blit(text, (SCREEN_CENTER[0] - text.get_width() / 2, SCREEN_CENTER[1]))
+                gfx.screen.blit(countdown, (SCREEN_CENTER[0] - countdown.get_width() / 2, SCREEN_CENTER[1] + 30))
+                helper_functions.refresh()
+                pg.time.wait(1000)
+            break
+
+        snd.play_song("gravitational_constant.ogg")
         self._is_running = True
 
     def game_over(self):
@@ -597,7 +612,7 @@ class GameControl:
             helper_functions.refresh()
             pg.time.delay(10)
         import glob
-        for image in sorted(glob.glob(path.join("gfx/GAMEOVER", "*.png"))):
+        for image in sorted(glob.glob(path.join("graphics/GAMEOVER", "*.png"))):
             gfx.screen.fill(constants.BLACK)
             part = pg.image.load(image).convert()
             gfx.screen.blit(part, (SCREEN_CENTER[0] - 250, SCREEN_CENTER[1]))
@@ -606,11 +621,8 @@ class GameControl:
         pg.time.wait(2000)
 
     def loop(self):
-        self.title_screen()
-        pg.mixer.music.stop()
-        pg.mixer.music.load(path.join("sounds", "music", "deadly_opposition.ogg"))
-        pg.mixer.music.play(-1)
-        while self._is_running and self.player_lives > 0:
+
+        while self.player_lives > 0:
             self.started = True
             self.on_event()
             self.update_loop()
@@ -622,6 +634,7 @@ class GameControl:
 if __name__ == "__main__":
     environ["SDL_VIDEO_CENTERED"] = "1"
     game = GameControl()
+    game.title_screen()
     game.on_init()
     game.loop()
     game.on_cleanup()
