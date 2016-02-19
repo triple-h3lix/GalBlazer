@@ -422,6 +422,9 @@ class GameControl:
         self.all_sprites.add(self.enemies)
         self.all_sprites.add(self.powerups)
 
+        if self.player_lives < 0:
+            self._is_running = False
+
         if self.started:
             self.t1 = 0 + time()
             self.time = round(self.t1 - self.t0, 1)
@@ -461,12 +464,6 @@ class GameControl:
                                             self.player.rect.centerx - fighter.rect.centerx <= 500):
                         fighter.shoot(self.player)
                         self.enemy_bullets.add(fighter.allBullets)
-                if self.player.rect.colliderect(fighter.rect):
-                    fighter.HEALTH -= 5
-                    self.player.die()
-                if fighter.HEALTH <= 0:
-                    fighter.die()
-                    self.KILL_COUNT += 1
 
             for frigate in self.frigates:
                 if frigate.rect.left >= constants.SCREEN_WIDTH:
@@ -483,6 +480,8 @@ class GameControl:
                     enemy.HEALTH -= 10
                     self.player.die()
                     self.player_lives -= 1
+                elif pg.sprite.collide_mask(self.player, enemy) and self.player.invulnerable:
+                    enemy.HEALTH -= 999
 
             for bullet in self.enemy_bullets:
                 if not self.player.dead and self.player.rect.colliderect(bullet.rect):
@@ -577,7 +576,7 @@ class GameControl:
                 if scroll <= constants.SCREEN_WIDTH:
                     scroll += 4
                     gfx.screen.blit(gfx.img_title_stars, (scroll, 100))
-                    gfx.screen.blit(gfx.img_title_stars, (-constants.SCREEN_WIDTH+scroll, 100))
+                    gfx.screen.blit(gfx.img_title_stars, (-constants.SCREEN_WIDTH + scroll, 100))
                 else:
                     scroll = 0
 
@@ -591,7 +590,7 @@ class GameControl:
                         gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1] - 100))
 
                         helper_functions.refresh()
-                    gfx.screen.blit(gfx.img_title_whole, (SCREEN_CENTER[0] - gfx.img_title_whole.get_width()/2, 100))
+                    gfx.screen.blit(gfx.img_title_whole, (SCREEN_CENTER[0] - gfx.img_title_whole.get_width() / 2, 100))
 
             break
 
@@ -634,8 +633,7 @@ class GameControl:
         pg.time.wait(2000)
 
     def loop(self):
-
-        while self.player_lives > 0:
+        while self._is_running:
             self.started = True
             self.on_event()
             self.update_loop()
