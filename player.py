@@ -45,16 +45,9 @@ class Player(pg.sprite.Sprite):
                 self.invulnerable = True
                 self.arrive = False
                 if self.invulnerable:
-                    self.image = gfx.img_player_flash
-                    helper_functions.refresh()
-                    self.anim_timer += 1
-                    if self.anim_timer > 20:
-                        self.image = gfx.img_player
-                        helper_functions.refresh()
-                        self.anim_timer = 0
-                        self.t += 1
-                        if self.t > 100:
-                            self.invulnerable = False
+                    self.t += 1
+                    if self.t > 100:
+                        self.invulnerable = False
 
         elif self.rect.right > constants.SCREEN_WIDTH:
             self.rect.x = constants.SCREEN_WIDTH - self.size[0]
@@ -73,18 +66,18 @@ class Player(pg.sprite.Sprite):
             self.dx = 0
             self.dy = 0
 
-        if not self.shooting and not self.invulnerable:
-            self.t = 0
-
         if self.dead:
             self.rect.y = self.start_position
             self.dead_timer += 1
-            if self.dead_timer >= 100:
+            if self.dead_timer >= 50:
                 self.image = gfx.img_player
                 self.rect.centerx = constants.SCREEN_WIDTH / 2
                 self.dead_timer = 0
                 self.dead = False
                 self.arrive = True
+
+        if not self.shooting and not self.invulnerable:
+            self.t = 0
 
         self.moving = False
         self.allBullets.update()

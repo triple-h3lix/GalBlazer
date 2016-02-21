@@ -15,21 +15,6 @@ import helper_functions
 # Shortcuts
 SCREEN_CENTER = (constants.SCREEN_WIDTH / 2, constants.SCREEN_HEIGHT / 2)
 
-# Font controller
-pg.font.init()
-font = pg.font.Font(path.join("fonts", "spacebit.ttf"), constants.FONT_SIZE)
-
-# Controller logic
-pg.joystick.init()
-try:
-    js = pg.joystick.Joystick(0)
-    js.init()
-except:
-    print("No joystick detected!")
-
-# Record time that program began
-start_time = pg.time.get_ticks()
-
 
 class Bullet(pg.sprite.Sprite):
     def __init__(self, x, y, image):
@@ -183,11 +168,10 @@ class EnemyFighter(pg.sprite.Sprite):
         import math
         for bullet in range(self.BULLETS_MAX):
             new_bullet = Bullet(self.rect.centerx, self.rect.bottom, gfx.img_enemy_shot_a)
-            new_bullet.dx = round(2 * math.cos(helper_functions.calc_angle(self, target)) * 5,
-                                  1) + helper_functions.randomize(.2)
-            new_bullet.dy = round(2 * math.sin(helper_functions.calc_angle(self, target)) * 5,
-                                  1) + helper_functions.randomize(.2)
+            new_bullet.dx = 5 * math.cos(helper_functions.calc_angle(self, target))
+            new_bullet.dy = 5 * math.sin(helper_functions.calc_angle(self, target))
             self.allBullets.add(new_bullet)
+            snd.load_sound("enemy_shoot.wav")
         self.has_shot = True
 
     def die(self):
@@ -312,11 +296,6 @@ class EnemyCruiser(pg.sprite.Sprite):
                     self.image = gfx.img_cruiser
                     self.firing = False
 
-        if self.charging:
-            print("charging")
-        if self.firing:
-            print("firing")
-
         if self.rect.left > 0 and self.rect.right < constants.SCREEN_WIDTH:
             self.rect.centerx += self.dx
         self.rect.bottom += self.dy
@@ -354,6 +333,9 @@ class GameControl:
     SCORE = 0
 
     def __init__(self):
+        self.screen = gfx.screen
+        self.font = None
+        self.js = None
         self._is_running = False
         self.started = True
         self.t0 = time()
@@ -376,8 +358,25 @@ class GameControl:
         self.spawn_timer = 0
 
     def on_init(self):
+        environ["SDL_VIDEO_CENTERED"] = "1"
+
         pg.init()
+        pg.display.init()
+        pg.mixer.pre_init(44100, -16, 2, 2048)
+        pg.mixer.init()
+        pg.font.init()
+        self.font = pg.font.Font(path.join("fonts", "spacebit.ttf"), constants.FONT_SIZE)
         self.clock = pg.time.Clock()
+
+        # Check if controller is present
+        pg.joystick.init()
+        try:
+            js = pg.joystick.Joystick(0)
+            js.init()
+        except:
+            print("No joystick detected!")
+
+        self.t1 = time()
 
     def on_event(self):
         pressed = pg.key.get_pressed()
@@ -399,23 +398,21 @@ class GameControl:
         for event in pg.event.get():
             if not self.player.dead:
                 if event.type == pg.JOYHATMOTION:
-                    if js.get_hat(0) == (-1, 0):
-                        print("HAT_Left")
+                    if self.js.get_hat(0) == (-1, 0):
                         self.player.move_left()
-                    if js.get_hat(0) == (1, 0):
-                        print("HAT_Right")
+                    if self.js.get_hat(0) == (1, 0):
                         self.player.move_right()
-                    if js.get_hat(0) == (0, 1):
-                        print("HAT_Up")
+                    if self.js.get_hat(0) == (0, 1):
                         self.player.move_up()
-                    if js.get_hat(0) == (0, -1):
-                        print("HAT_Down")
+                    if self.js.get_hat(0) == (0, -1):
                         self.player.move_down()
                 if event.type == pg.JOYBUTTONDOWN:
-                    if js.get_button(0):
+                    if self.js.get_button(0):
                         self.player.shoot()
 
     def update_loop(self):
+        self.time = round(self.t1 - self.t0, 1)
+
         self.all_sprites.add(self.player_bullets)
         self.all_sprites.add(self.enemy_bullets)
         self.all_sprites.add(self.player)
@@ -425,23 +422,17 @@ class GameControl:
         if self.player_lives < 0:
             self._is_running = False
 
-        if self.started:
-            self.t1 = 0 + time()
-            self.time = round(self.t1 - self.t0, 1)
-
-        if self.time > 10 and not self.player.arrive:
-            self.started = False
-            if len(self.cruiser) < 1 and self.time >= 120:
+        if self.started and not self.player.arrive:
+            if len(self.cruiser) < 1 and self.KILL_COUNT >= 120:
                 snd.play_song("deadly_opposition.ogg")
                 big_enemy = EnemyCruiser()
                 self.cruiser.add(big_enemy)
                 self.enemies.add(self.cruiser)
-                self.time = 0
 
             if not self.player.dead and len(self.fighters) < self.MAX_ENEMIES:
                 if len(self.cruiser) == 0:
                     self.spawn_timer += 1
-                    if self.spawn_timer >= 10:
+                    if self.spawn_timer >= 20:
                         little_enemy = EnemyFighter()
                         self.fighters.add(little_enemy)
                         self.enemies.add(self.fighters)
@@ -461,7 +452,7 @@ class GameControl:
             for fighter in self.fighters:
                 if not self.player.dead and not fighter.has_shot:
                     if abs(self.player.rect.y - fighter.rect.bottom <= 300) and abs(
-                                            self.player.rect.centerx - fighter.rect.centerx <= 500):
+                                            self.player.rect.centerx - fighter.rect.centerx <= 500) and fighter.rect.y <= 900:
                         fighter.shoot(self.player)
                         self.enemy_bullets.add(fighter.allBullets)
 
@@ -480,8 +471,8 @@ class GameControl:
                     enemy.HEALTH -= 10
                     self.player.die()
                     self.player_lives -= 1
-                elif pg.sprite.collide_mask(self.player, enemy) and self.player.invulnerable:
-                    enemy.HEALTH -= 999
+                elif pg.sprite.collide_rect(self.player, enemy) and self.player.invulnerable:
+                    enemy.HEALTH = 0
 
             for bullet in self.enemy_bullets:
                 if not self.player.dead and self.player.rect.colliderect(bullet.rect):
@@ -532,7 +523,7 @@ class GameControl:
     def on_render(self):
         gfx.screen.blit(gfx.img_background, (0, 0))
         self.stars.render()
-        score = font.render("ENEMIES KILLED: " + str(self.KILL_COUNT), True, constants.WHITE)
+        score = self.font.render("ENEMIES KILLED: " + str(self.KILL_COUNT), True, constants.WHITE)
         lives = [(constants.SCREEN_WIDTH - (gfx.img_life.get_width() + 10),
                   constants.SCREEN_HEIGHT - gfx.img_life.get_height() - 20),
                  (constants.SCREEN_WIDTH - (gfx.img_life.get_width() + 10) * 2,
@@ -543,7 +534,7 @@ class GameControl:
         for i in range(self.player_lives):
             gfx.screen.blit(gfx.img_life, lives[i])
         pg.display.update(self.all_sprites.draw(gfx.screen))
-        helper_functions.refresh()
+        pg.display.flip()
 
     def on_cleanup(self):
         pg.quit()
@@ -551,60 +542,73 @@ class GameControl:
         exit()
 
     def title_screen(self):
+        scroll = 0
+        anim = 0
+        ship_image = None
+
         while True:
-            scroll = 0
             title_a = gfx.img_title_a
             title_b = gfx.img_title_b
             title_size = title_a.get_size()
             steps = int(title_size[0] / 2)
-            for i in range(steps + 69):
+            for i in range(steps + 75):
                 gfx.screen.blit(gfx.img_title_background, (0, 0))
                 gfx.screen.blit(gfx.img_title_stars, (0, 100))
-                pg.display.update(gfx.screen.blit(title_a, (-title_size[0] + i + i, 100)))
-                pg.display.update(gfx.screen.blit(title_b, (constants.SCREEN_WIDTH - i - i, 100)))
-                pg.display.flip()
+                gfx.screen.blit(title_a, (10 - title_size[0] + i * 2, 300))
+                gfx.screen.blit(title_b, (10 + constants.SCREEN_WIDTH - i * 2, 300))
             snd.load_sound("blow_up.wav")
             snd.play_song("title_song.ogg")
+            break
 
-            while True:
-                e = pg.event.poll()
-                if e.type == pg.KEYDOWN:
-                    if e.key == pg.K_RETURN:
-                        snd.load_sound("explode.wav")
+        while True:
+
+            if scroll <= constants.SCREEN_WIDTH:
+                scroll += .5
+            else:
+                scroll = 0
+
+            gfx.screen.blit(gfx.img_title_stars, (scroll, 100))
+            gfx.screen.blit(gfx.img_title_stars, (-constants.SCREEN_WIDTH + scroll, 100))
+            gfx.screen.blit(gfx.img_title_whole, (SCREEN_CENTER[0] - gfx.img_title_whole.get_width() / 2 + 20, 300))
+
+            for _ in range(1):
+                if anim < 30:
+                    ship_image = gfx.title_ship_a
+                elif anim > 30:
+                    ship_image = gfx.title_ship_b
+                pg.display.update(self.screen.blit(ship_image,
+                                 (SCREEN_CENTER[0] - (gfx.title_ship_a.get_width() / 2) + 20, 600)))
+
+                if anim < 50:
+                    menu = self.font.render("PRESS ENTER", True, constants.WHITE)
+                    gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1]))
+                elif anim > 50:
+                    menu = self.font.render("PRESS ENTER", True, constants.BLACK)
+                    gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1]))
+
+            anim += 1
+            if anim >= 100:
+                anim = 0
+            print(anim)
+
+            pg.display.update()
+
+            e = pg.event.poll()
+            if e.type == pg.KEYDOWN:
+                if e.key == pg.K_RETURN:
+                    snd.load_sound("takeoff.wav")
+                    while True:
+                        for i in range(255):
+                            gfx.screen.fill((255 - i, 255 - i, 255 - i))
+                            helper_functions.refresh()
                         break
-
-                if scroll <= constants.SCREEN_WIDTH:
-                    scroll += 4
-                    gfx.screen.blit(gfx.img_title_stars, (scroll, 100))
-                    gfx.screen.blit(gfx.img_title_stars, (-constants.SCREEN_WIDTH + scroll, 100))
-                else:
-                    scroll = 0
-
-                for i in range(60):
-                    if i <= 30:
-                        menu = font.render("PRESS ENTER", True, constants.WHITE)
-                        gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1] - 100))
-                        helper_functions.refresh()
-                    elif i >= 30:
-                        menu = font.render("PRESS ENTER", True, constants.BLACK)
-                        gfx.screen.blit(menu, (SCREEN_CENTER[0] - menu.get_width() / 2, SCREEN_CENTER[1] - 100))
-
-                        helper_functions.refresh()
-                    gfx.screen.blit(gfx.img_title_whole, (SCREEN_CENTER[0] - gfx.img_title_whole.get_width() / 2, 100))
-
-            break
+                    break
 
         while True:
-            for i in range(255):
-                gfx.screen.fill((255 - i, 255 - i, 255 - i))
-                helper_functions.refresh()
-            break
-
-        while True:
-            text = font.render("GET READY", True, constants.WHITE)
+            text = self.font.render("GET READY", True, constants.WHITE)
             count_list = ["5", "4", "3", "2", "1", "GO!"]
             for i in range(6):
-                countdown = font.render(count_list[i], True, constants.WHITE)
+                countdown = self.font.render(count_list[i], True, constants.WHITE)
                 gfx.screen.fill(constants.BLACK)
                 gfx.screen.blit(text, (SCREEN_CENTER[0] - text.get_width() / 2, SCREEN_CENTER[1]))
                 gfx.screen.blit(countdown, (SCREEN_CENTER[0] - countdown.get_width() / 2, SCREEN_CENTER[1] + 30))
@@ -633,6 +637,7 @@ class GameControl:
         pg.time.wait(2000)
 
     def loop(self):
+        self.title_screen()
         while self._is_running:
             self.started = True
             self.on_event()
@@ -643,9 +648,7 @@ class GameControl:
 
 
 if __name__ == "__main__":
-    environ["SDL_VIDEO_CENTERED"] = "1"
     game = GameControl()
-    game.title_screen()
     game.on_init()
     game.loop()
     game.on_cleanup()

@@ -5,7 +5,6 @@ import pygame as pg
 
 import constants
 
-pg.display.init()
 screen = pg.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT),
                              pg.DOUBLEBUF | pg.HWSURFACE | pg.HWACCEL | pg.HWPALETTE)
 
@@ -47,6 +46,9 @@ img_enemy_shot_b = pg.image.load(path.join("graphics", "enemy_shot_b.png")).conv
 
 scanlines = pg.image.load(path.join("scanlines.png")).convert_alpha()
 scanlines = pg.transform.scale(scanlines, (constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
+
+title_ship_a = pg.image.load(path.join("graphics", "TITLE_SHIP", "zx_delta_1.png")).convert_alpha()
+title_ship_b = pg.image.load(path.join("graphics", "TITLE_SHIP", "zx_delta_2.png")).convert_alpha()
 
 
 def explosion(x, y):

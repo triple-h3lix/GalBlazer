@@ -1,14 +1,11 @@
 import pygame as pg
 from os import path
 
-pg.mixer.pre_init(44100, -16, 2, 2048)
-pg.mixer.init()
-
 # Sounds Library
-# snd_shoot = pg.mixer.Sound('pewpew.wav')
-# snd_hit = pg.mixer.Sound('hit.wav')
-# snd_explode = pg.mixer.Sound('explode.wav')
-# snd_blow = pg.mixer.Sound('blow_up.wav')
+# shoot = pg.mixer.Sound('pewpew.wav')
+# hit = pg.mixer.Sound(path.join("sounds", "hit.wav"))
+# little_explode = pg.mixer.Sound('explode.wav')
+# big_explode = pg.mixer.Sound('blow_up.wav')
 
 
 def load_sound(FILENAME):
