@@ -556,7 +556,12 @@ class GameControl:
                 gfx.screen.blit(gfx.img_title_stars, (0, 100))
                 gfx.screen.blit(title_a, (10 - title_size[0] + i * 2, 300))
                 gfx.screen.blit(title_b, (10 + constants.SCREEN_WIDTH - i * 2, 300))
+                pg.display.flip()
             snd.load_sound("blow_up.wav")
+            for i in range(100):
+                self.screen.fill((i,i,i))
+                pg.display.update()
+            gfx.screen.blit(gfx.img_title_background, (0, 0))
             snd.play_song("title_song.ogg")
             break
 
