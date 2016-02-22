@@ -179,7 +179,6 @@ class EnemyFighter(pg.sprite.Sprite):
         self.image = gfx.img_explosion
         s = gfx.screen.blit(self.image, (self.rect.x - 40, self.rect.y - 40))
         pg.display.update(s)
-        pg.time.delay(10)
         self.kill()
 
 
@@ -230,7 +229,6 @@ class EnemyFrigate(pg.sprite.Sprite):
         self.image = pg.transform.scale(self.image, (300, 300))
         s = gfx.screen.blit(self.image, (self.rect.x - 50, self.rect.y - 120))
         pg.display.update(s)
-        pg.time.delay(10)
         self.kill()
 
 
@@ -316,11 +314,9 @@ class EnemyCruiser(pg.sprite.Sprite):
             pg.display.update(
                     gfx.explosion(self.center[0] + randrange(-100, 100, 20), self.center[1] + randrange(-100, 100, 20)))
             snd.load_sound("explode.wav")
-            pg.time.delay(20)
         self.image = pg.transform.scale2x(gfx.load_image("explosion_last.png"))
         snd.load_sound("blow_up.wav")
-        helper_functions.refresh()
-        pg.time.wait(100)
+        pg.display.update()()
         snd.play_song("gravitational_constant.ogg")
         self.kill()
 
@@ -377,6 +373,7 @@ class GameControl:
             print("No joystick detected!")
 
         self.t1 = time()
+        self._is_running = True
 
     def on_event(self):
         pressed = pg.key.get_pressed()
@@ -521,8 +518,11 @@ class GameControl:
         self.clock.tick(self.FPS)
 
     def on_render(self):
+        # Background rendering
         gfx.screen.blit(gfx.img_background, (0, 0))
         self.stars.render()
+
+        # Display game info
         score = self.font.render("ENEMIES KILLED: " + str(self.KILL_COUNT), True, constants.WHITE)
         lives = [(constants.SCREEN_WIDTH - (gfx.img_life.get_width() + 10),
                   constants.SCREEN_HEIGHT - gfx.img_life.get_height() - 20),
@@ -530,11 +530,16 @@ class GameControl:
                   constants.SCREEN_HEIGHT - gfx.img_life.get_height() - 20), (
                      constants.SCREEN_WIDTH - (gfx.img_life.get_width() + 10) * 3,
                      constants.SCREEN_HEIGHT - gfx.img_life.get_height() - 20)]
-        gfx.screen.blit(score, (20, constants.SCREEN_HEIGHT - 50))
         for i in range(self.player_lives):
             gfx.screen.blit(gfx.img_life, lives[i])
-        pg.display.update(self.all_sprites.draw(gfx.screen))
-        pg.display.flip()
+
+        gfx.screen.blit(score, (20, constants.SCREEN_HEIGHT - 50))
+
+        # Update sprites
+        self.all_sprites.draw(gfx.screen)
+
+        # Draw screen (with scanline)
+        pg.display.update(gfx.scanlines.get_rect())
 
     def on_cleanup(self):
         pg.quit()
@@ -556,12 +561,15 @@ class GameControl:
                 gfx.screen.blit(gfx.img_title_stars, (0, 100))
                 gfx.screen.blit(title_a, (10 - title_size[0] + i * 2, 300))
                 gfx.screen.blit(title_b, (10 + constants.SCREEN_WIDTH - i * 2, 300))
+                helper_functions.scanlines()
                 pg.display.flip()
             snd.load_sound("blow_up.wav")
             for i in range(100):
                 self.screen.fill((i,i,i))
+                helper_functions.scanlines()
                 pg.display.update()
             gfx.screen.blit(gfx.img_title_background, (0, 0))
+            helper_functions.scanlines()
             snd.play_song("title_song.ogg")
             break
 
@@ -594,8 +602,8 @@ class GameControl:
             anim += 1
             if anim >= 100:
                 anim = 0
-            print(anim)
 
+            helper_functions.scanlines()
             pg.display.update()
 
             e = pg.event.poll()
@@ -605,7 +613,8 @@ class GameControl:
                     while True:
                         for i in range(255):
                             gfx.screen.fill((255 - i, 255 - i, 255 - i))
-                            helper_functions.refresh()
+                            helper_functions.scanlines()
+                            pg.display.update()
                         break
                     break
 
@@ -617,12 +626,13 @@ class GameControl:
                 gfx.screen.fill(constants.BLACK)
                 gfx.screen.blit(text, (SCREEN_CENTER[0] - text.get_width() / 2, SCREEN_CENTER[1]))
                 gfx.screen.blit(countdown, (SCREEN_CENTER[0] - countdown.get_width() / 2, SCREEN_CENTER[1] + 30))
-                helper_functions.refresh()
+                helper_functions.scanlines()
+                pg.display.update()
                 pg.time.wait(1000)
             break
 
         snd.play_song("gravitational_constant.ogg")
-        self._is_running = True
+        self.started = True
 
     def game_over(self):
         pg.mixer.music.stop()
@@ -630,25 +640,22 @@ class GameControl:
         gfx.screen.fill((255, 255, 255))
         for i in range(255):
             gfx.screen.fill((255 - i, 255 - i, 255 - i))
-            helper_functions.refresh()
-            pg.time.delay(10)
+            pg.display.update()
         import glob
         for image in sorted(glob.glob(path.join("graphics/GAMEOVER", "*.png"))):
             gfx.screen.fill(constants.BLACK)
             part = pg.image.load(image).convert()
             gfx.screen.blit(part, (SCREEN_CENTER[0] - 250, SCREEN_CENTER[1]))
-            helper_functions.refresh()
-            pg.time.delay(100)
+            pg.display.update()
         pg.time.wait(2000)
 
     def loop(self):
-        self.title_screen()
         while self._is_running:
-            self.started = True
-            self.on_event()
-            self.update_loop()
-            self.on_render()
-
+            self.title_screen()
+            while self.started:
+                self.on_event()
+                self.update_loop()
+                self.on_render()
         self.game_over()
 
 

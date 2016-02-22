@@ -4,7 +4,7 @@ import gfx
 import pygame as pg
 
 
-def refresh():
+def scanlines():
     gfx.screen.blit(gfx.scanlines, (0, 0))
     return pg.display.update()
 

@@ -5,8 +5,7 @@ import pygame as pg
 
 import constants
 
-screen = pg.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT),
-                             pg.DOUBLEBUF | pg.HWSURFACE | pg.HWACCEL | pg.HWPALETTE)
+screen = pg.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT), pg.FULLSCREEN)
 
 
 def load_image(file):
@@ -52,9 +51,9 @@ title_ship_b = pg.image.load(path.join("graphics", "TITLE_SHIP", "zx_delta_2.png
 
 
 def explosion(x, y):
-
     for file in glob("graphics/explosion_1/*.png"):
         image = pg.image.load(file).convert()
         image = pg.transform.scale(image, (200, 200))
-        for time in range(200):
-            pg.display.update(screen.blit(image, (x-80, y-80)))
+        for _ in range(10):
+            screen.blit(image, (x-80, y-80))
+            pg.display.update()

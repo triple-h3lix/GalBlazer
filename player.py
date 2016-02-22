@@ -107,7 +107,7 @@ class Player(pg.sprite.Sprite):
                        (last_x - offset, last_y + length + 5), True)
         pg.draw.aaline(gfx.screen, (255, 255, 255), (last_x + offset, last_y - 5),
                        (last_x + offset, last_y + length + 5), True)
-        helper_functions.refresh()
+        pg.display.update()
 
     def shoot(self):
         if not self.dead and not self.arrive:
@@ -167,6 +167,5 @@ class Player(pg.sprite.Sprite):
         self.last_y = self.rect.y
         snd.load_sound("explode.wav")
         gfx.explosion(self.last_x, self.last_y)
-        pg.time.delay(20)
         self.power_level = 1
         self.dead = True
