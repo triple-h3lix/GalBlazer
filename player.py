@@ -4,7 +4,6 @@ import constants
 import gfx
 import main
 import snd
-import helper_functions
 
 
 class Player(pg.sprite.Sprite):
@@ -27,7 +26,9 @@ class Player(pg.sprite.Sprite):
         self.last_x = 0
         self.last_y = 0
         self.dead = False
+        self.respawn = False
         self.invulnerable = False
+        self.invulnerable_timer = 0
         self.dead_timer = pg.time.get_ticks()
         self.cool_down = 0
         self.power_level = 1
@@ -36,20 +37,15 @@ class Player(pg.sprite.Sprite):
 
     def update(self):
 
-        if self.arrive:
-            self.dy = -5
-            self.dx = 0
-            self.rect.y += self.dy
-            self.draw_trail(constants.SCREEN_HEIGHT, 3)
-            if self.rect.bottom < constants.SCREEN_HEIGHT - 200:
-                self.invulnerable = True
-                self.arrive = False
-                if self.invulnerable:
-                    self.t += 1
-                    if self.t > 100:
-                        self.invulnerable = False
+        if self.arrive or self.respawn:
+            self.invulnerable = True
+            self.appear()
+        elif self.invulnerable:
+            self.invulnerable_timer += 1
+            if self.invulnerable_timer > 50:
+                self.invulnerable = False
 
-        elif self.rect.right > constants.SCREEN_WIDTH:
+        if self.rect.right > constants.SCREEN_WIDTH:
             self.rect.x = constants.SCREEN_WIDTH - self.size[0]
             self.dx = 0
         elif self.rect.left < 0:
@@ -59,9 +55,11 @@ class Player(pg.sprite.Sprite):
             self.rect.bottom = constants.SCREEN_HEIGHT
             self.dy = 0
 
-        if self.moving and not self.arrive:
-            self.rect.x += self.dx
-            self.rect.y += self.dy
+        if self.moving:
+            if not all([self.dead or self.respawn]):
+                for i in range(self.speed):
+                    self.rect.x += self.dx
+                    self.rect.y += self.dy
         else:
             self.dx = 0
             self.dy = 0
@@ -72,31 +70,57 @@ class Player(pg.sprite.Sprite):
             if self.dead_timer >= 50:
                 self.image = gfx.img_player
                 self.rect.centerx = constants.SCREEN_WIDTH / 2
-                self.dead_timer = 0
                 self.dead = False
-                self.arrive = True
+                self.respawn = True
+        else:
+            self.dead_timer = 0
 
-        if not self.shooting and not self.invulnerable:
+        if not self.shooting:
             self.t = 0
 
         self.moving = False
         self.allBullets.update()
 
     def move_left(self):
-        self.dx = -self.speed
+        self.dx, self.dy = -1, 0
         self.moving = True
 
     def move_right(self):
-        self.dx = self.speed
+        self.dx, self.dy = 1, 0
         self.moving = True
 
     def move_up(self):
-        self.dy = -self.speed
+        self.dx, self.dy = 0, -1
         self.moving = True
 
     def move_down(self):
-        self.dy = self.speed
+        self.dx, self.dy = 0, 1
         self.moving = True
+
+    def move_upleft(self):
+        self.dx, self.dy = -1, -1
+        self.moving = True
+
+    def move_upright(self):
+        self.dx, self.dy = 1, -1
+        self.moving = True
+
+    def move_downleft(self):
+        self.dx, self.dy = -1, 1
+        self.moving = True
+
+    def move_downright(self):
+        self.dx, self.dy = 1, 1
+        self.moving = True
+
+    def appear(self):
+        self.dy = -3
+        self.dx = 0
+        self.rect.y += self.dy
+        self.draw_trail(constants.SCREEN_HEIGHT, 3)
+        if self.rect.bottom < constants.SCREEN_HEIGHT - constants.SCREEN_HEIGHT/2:
+            self.arrive = False
+            self.respawn = False
 
     def draw_trail(self, length, offset):
         last_x = self.rect.centerx

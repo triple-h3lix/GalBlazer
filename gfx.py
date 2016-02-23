@@ -5,7 +5,10 @@ import pygame as pg
 
 import constants
 
-screen = pg.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT), pg.FULLSCREEN)
+screen = pg.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
+
+def set_gamma(value):
+    return pg.display.set_gamma(value)
 
 
 def load_image(file):

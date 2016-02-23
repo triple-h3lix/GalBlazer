@@ -5,9 +5,7 @@ import pygame as pg
 
 
 def scanlines():
-    gfx.screen.blit(gfx.scanlines, (0, 0))
-    return pg.display.update()
-
+    return gfx.screen.blit(gfx.scanlines, (0, 0))
 
 def randomize(scale):
     return choice([-scale, 0, scale])

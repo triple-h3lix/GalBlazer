@@ -1,16 +1,16 @@
+import math
 from os import path, environ
 from random import choice, randrange, randint
 from sys import exit
 from time import time
-import math
 
 import pygame as pg
 
 import constants
 import gfx
+import helper_functions
 import player
 import snd
-import helper_functions
 
 # Shortcuts
 SCREEN_CENTER = (constants.SCREEN_WIDTH / 2, constants.SCREEN_HEIGHT / 2)
@@ -330,9 +330,10 @@ class GameControl:
 
     def __init__(self):
         self.screen = gfx.screen
+        self._is_fullscreen = False
         self.font = None
         self.js = None
-        self._is_running = False
+        self._is_running = True
         self.started = True
         self.t0 = time()
         self.t1 = 0
@@ -351,6 +352,7 @@ class GameControl:
         self.enemies = pg.sprite.Group()
         self.enemy_bullets = pg.sprite.Group()
         self.all_sprites = pg.sprite.Group()
+        self.star_speed = 1
         self.spawn_timer = 0
 
     def on_init(self):
@@ -361,51 +363,49 @@ class GameControl:
         pg.mixer.pre_init(44100, -16, 2, 2048)
         pg.mixer.init()
         pg.font.init()
+        gfx.set_gamma(1.2)
+
         self.font = pg.font.Font(path.join("fonts", "spacebit.ttf"), constants.FONT_SIZE)
         self.clock = pg.time.Clock()
 
-        # Check if controller is present
-        pg.joystick.init()
-        try:
-            js = pg.joystick.Joystick(0)
-            js.init()
-        except:
-            print("No joystick detected!")
-
         self.t1 = time()
-        self._is_running = True
 
     def on_event(self):
+        for e in pg.event.get():
+            if e.type == pg.QUIT:
+                pg.quit()
+                exit()
+            if e.type == pg.KEYDOWN:
+                if e.key == pg.K_ESCAPE:
+                    self._is_running = False
+                if e.key == pg.K_F1:
+                    if not self._is_fullscreen:
+                        pg.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT), pg.FULLSCREEN)
+                        self._is_fullscreen = True
+                    elif self._is_fullscreen:
+                        pg.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
+                        self._is_fullscreen = False
+
         pressed = pg.key.get_pressed()
         if not self.player.dead:
-            if pressed[pg.K_UP]:
-                self.player.move_up()
-            if pressed[pg.K_DOWN]:
-                self.player.move_down()
             if pressed[pg.K_LEFT]:
                 self.player.move_left()
             if pressed[pg.K_RIGHT]:
                 self.player.move_right()
+            if pressed[pg.K_UP]:
+                self.player.move_up()
+            if pressed[pg.K_DOWN]:
+                self.player.move_down()
+            if pressed[pg.K_UP] and pressed[pg.K_LEFT]:
+                self.player.move_upleft()
+            if pressed[pg.K_UP] and pressed[pg.K_RIGHT]:
+                self.player.move_upright()
+            if pressed[pg.K_DOWN] and pressed[pg.K_LEFT]:
+                self.player.move_downleft()
+            if pressed[pg.K_DOWN] and pressed[pg.K_RIGHT]:
+                self.player.move_downright()
             if pressed[pg.K_SPACE]:
                 self.player.shoot()
-        if pressed[pg.K_ESCAPE]:
-            self._is_running = False
-
-        # These handle input from a controller
-        for event in pg.event.get():
-            if not self.player.dead:
-                if event.type == pg.JOYHATMOTION:
-                    if self.js.get_hat(0) == (-1, 0):
-                        self.player.move_left()
-                    if self.js.get_hat(0) == (1, 0):
-                        self.player.move_right()
-                    if self.js.get_hat(0) == (0, 1):
-                        self.player.move_up()
-                    if self.js.get_hat(0) == (0, -1):
-                        self.player.move_down()
-                if event.type == pg.JOYBUTTONDOWN:
-                    if self.js.get_button(0):
-                        self.player.shoot()
 
     def update_loop(self):
         self.time = round(self.t1 - self.t0, 1)
@@ -416,10 +416,10 @@ class GameControl:
         self.all_sprites.add(self.enemies)
         self.all_sprites.add(self.powerups)
 
-        if self.player_lives < 0:
+        if self.player_lives <= 0:
             self._is_running = False
 
-        if self.started and not self.player.arrive:
+        if self._is_running and not self.player.arrive:
             if len(self.cruiser) < 1 and self.KILL_COUNT >= 120:
                 snd.play_song("deadly_opposition.ogg")
                 big_enemy = EnemyCruiser()
@@ -463,19 +463,18 @@ class GameControl:
                     cruiser.allBullets.empty()
                 self.enemy_bullets.add(cruiser.allBullets)
 
-            for enemy in self.enemies:
-                if pg.sprite.collide_mask(self.player, enemy) and not self.player.invulnerable:
-                    enemy.HEALTH -= 10
-                    self.player.die()
-                    self.player_lives -= 1
-                elif pg.sprite.collide_rect(self.player, enemy) and self.player.invulnerable:
-                    enemy.HEALTH = 0
+            if not self.player.invulnerable:
+                for enemy in self.enemies:
+                    if pg.sprite.collide_mask(self.player, enemy):
+                        enemy.HEALTH -= 10
+                        self.player.die()
+                        self.player_lives -= 1
 
-            for bullet in self.enemy_bullets:
-                if not self.player.dead and self.player.rect.colliderect(bullet.rect):
-                    self.player.die()
-                    bullet.kill()
-                    self.player_lives -= 1
+                for bullet in self.enemy_bullets:
+                    if not self.player.dead and self.player.rect.colliderect(bullet.rect):
+                        self.player.die()
+                        bullet.kill()
+                        self.player_lives -= 1
 
             for bullet in self.player_bullets:
                 for enemy in self.enemies:
@@ -518,9 +517,17 @@ class GameControl:
         self.clock.tick(self.FPS)
 
     def on_render(self):
+        # Mimic the apperance of hyper drive
+        if self.player.arrive:
+            self.star_speed = 8
+
+        elif self.star_speed > 1 and not self.player.arrive:
+            self.star_speed -= 1
+
         # Background rendering
         gfx.screen.blit(gfx.img_background, (0, 0))
-        self.stars.render()
+        for _ in range(self.star_speed):
+            self.stars.render()
 
         # Display game info
         score = self.font.render("ENEMIES KILLED: " + str(self.KILL_COUNT), True, constants.WHITE)
@@ -535,11 +542,12 @@ class GameControl:
 
         gfx.screen.blit(score, (20, constants.SCREEN_HEIGHT - 50))
 
-        # Update sprites
-        self.all_sprites.draw(gfx.screen)
+        # Render each sprite
+        pg.display.update(self.all_sprites.draw(gfx.screen))
 
         # Draw screen (with scanline)
-        pg.display.update(gfx.scanlines.get_rect())
+        helper_functions.scanlines()
+        pg.display.flip()
 
     def on_cleanup(self):
         pg.quit()
@@ -560,12 +568,12 @@ class GameControl:
                 gfx.screen.blit(gfx.img_title_background, (0, 0))
                 gfx.screen.blit(gfx.img_title_stars, (0, 100))
                 gfx.screen.blit(title_a, (10 - title_size[0] + i * 2, 300))
-                gfx.screen.blit(title_b, (10 + constants.SCREEN_WIDTH - i * 2, 300))
+                gfx.screen.blit(title_b, (10 + constants.SCREEN_WIDTH - i * 2, 301))
                 helper_functions.scanlines()
                 pg.display.flip()
             snd.load_sound("blow_up.wav")
             for i in range(100):
-                self.screen.fill((i,i,i))
+                self.screen.fill((i, i, i))
                 helper_functions.scanlines()
                 pg.display.update()
             gfx.screen.blit(gfx.img_title_background, (0, 0))
@@ -585,12 +593,11 @@ class GameControl:
             gfx.screen.blit(gfx.img_title_whole, (SCREEN_CENTER[0] - gfx.img_title_whole.get_width() / 2 + 20, 300))
 
             for _ in range(1):
-                if anim < 30:
+                if anim < 20:
                     ship_image = gfx.title_ship_a
-                elif anim > 30:
+                elif anim > 20:
                     ship_image = gfx.title_ship_b
-                pg.display.update(self.screen.blit(ship_image,
-                                 (SCREEN_CENTER[0] - (gfx.title_ship_a.get_width() / 2) + 20, 600)))
+                self.screen.blit(ship_image, (SCREEN_CENTER[0] - (gfx.title_ship_a.get_width() / 2) + 20, 600))
 
                 if anim < 50:
                     menu = self.font.render("PRESS ENTER", True, constants.WHITE)
@@ -631,7 +638,7 @@ class GameControl:
                 pg.time.wait(1000)
             break
 
-        snd.play_song("gravitational_constant.ogg")
+        snd.play_song("saturns_folly.ogg")
         self.started = True
 
     def game_over(self):
@@ -650,9 +657,9 @@ class GameControl:
         pg.time.wait(2000)
 
     def loop(self):
-        while self._is_running:
+        if self._is_running:
             self.title_screen()
-            while self.started:
+            while self._is_running:
                 self.on_event()
                 self.update_loop()
                 self.on_render()
