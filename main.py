@@ -210,10 +210,6 @@ class EnemyFrigate(pg.sprite.Sprite):
         else:
             self.image = gfx.img_frigate
 
-        # if self.rect.x == randint(100, 500):
-        #     if len(self.allBullets) < self.MAX_SHOTS:
-        #         self.shoot()
-
         self.rect.x += self.dx
 
     def shoot(self):
@@ -233,8 +229,7 @@ class EnemyFrigate(pg.sprite.Sprite):
 
 class EnemyCruiser(pg.sprite.Sprite):
     image = None
-    HEALTH = 500
-
+    HEALTH = 1000
     allBullets = pg.sprite.Group()
 
     def __init__(self):
@@ -255,12 +250,13 @@ class EnemyCruiser(pg.sprite.Sprite):
         self.charge = 0
         self.duration = 0
         self.beamtime = 0
+        self.new_pos = "middle_to_left"
 
     def update(self):
         if self.is_hit:
             self.image = gfx.img_cruiser_hit
             self.is_hit = False
-            if self.HEALTH <= 0:
+            if self.HEALTH < 0:
                 self.die()
         else:
             self.image = gfx.img_cruiser
@@ -270,32 +266,85 @@ class EnemyCruiser(pg.sprite.Sprite):
             self.charge = 0
             self.duration = 0
             self.next_shot += 1
-            if self.next_shot >= 500:
+            if self.next_shot >= 250:
                 self.charging = True
                 self.next_shot = 0
 
         if self.charging:
+            self.has_shot = False
             self.firing = False
             self.charge += 1
             snd.load_sound("charging.wav")
-            if self.charge >= 180:
+            if self.charge >= 150:
                 self.firing = True
+
         if self.firing:
             self.charging = False
-
             self.image = gfx.img_cruiser_firing
             self.beamtime += 1
             if self.beamtime >= 5:
                 self.duration += 1
                 self.fire_beam()
                 self.beamtime = 0
-                if self.duration >= 100:
+                if self.duration >= 20:
                     self.image = gfx.img_cruiser
+                    self.has_shot = True
                     self.firing = False
 
+        if self.has_shot and not self.firing:
+            # Move to new position based on last location
+            if self.new_pos == "middle_to_left":
+                if self.rect.left > 100:
+                    self.dx = -1
+                else:
+                    self.dx = 0
+                    self.new_pos = "left_to_middle"
+                    self.has_shot = False
+
+                if self.HEALTH < 500 and self.rect.centerx % 10 == 0:
+                    self.fire_shots()
+
+            elif self.new_pos == "left_to_middle":
+                if self.rect.centerx < SCREEN_CENTER[0]:
+                    self.dx = 1
+
+                else:
+                    self.dx = 0
+                    self.new_pos = "middle_to_right"
+                    self.has_shot = False
+
+                if self.HEALTH < 500 and self.rect.centerx % 10 == 0:
+                    self.fire_shots()
+
+            elif self.new_pos == "middle_to_right":
+                if self.rect.right < SCREEN_WIDTH - 100:
+                    self.dx = 1
+
+                else:
+                    self.dx = 0
+                    self.new_pos = "right_to_middle"
+                    self.has_shot = False
+
+                if self.HEALTH < 500 and self.rect.centerx % 10 == 0:
+                    self.fire_shots()
+
+            elif self.new_pos == "right_to_middle":
+                if self.rect.centerx > SCREEN_CENTER[0]:
+                    self.dx = -1
+
+                else:
+                    self.dx = 0
+                    self.new_pos = "middle_to_left"
+                    self.has_shot = False
+
+                if self.HEALTH < 500 and self.rect.centerx % 10 == 0:
+                    self.fire_shots()
+
         if self.rect.left > 0 and self.rect.right < SCREEN_WIDTH:
-            self.rect.centerx += self.dx
-        self.rect.bottom += self.dy
+            self.rect.x += self.dx
+            self.rect.y += self.dy
+        elif self.HEALTH < self.HEALTH / 2:
+            self.dx *= 2
 
     def fire_beam(self):
 
@@ -308,6 +357,15 @@ class EnemyCruiser(pg.sprite.Sprite):
         pg.display.update(s)
         self.has_shot = True
 
+    def fire_shots(self):
+        shot_left = Bullet(self.rect.left, self.rect.y + 100, gfx.img_enemy_shot_a)
+        shot_right = Bullet(self.rect.right, self.rect.y + 100, gfx.img_enemy_shot_a)
+        shot_left.dx = -1 * helper_functions.randomize(1)
+        shot_left.dy = 5
+        shot_right.dx = 1 * helper_functions.randomize(1)
+        shot_right.dy = 5
+        self.allBullets.add(shot_left, shot_right)
+
     def die(self):
         for i in range(9):
             pg.display.update(
@@ -315,9 +373,14 @@ class EnemyCruiser(pg.sprite.Sprite):
             snd.load_sound("explode.wav")
         self.image = pg.transform.scale2x(gfx.load_image("explosion_last.png"))
         snd.load_sound("blow_up.wav")
-        pg.display.update()()
-        snd.play_song("gravitational_constant.ogg")
+        pg.display.update()
+        snd.play_song("saturns_folly.ogg")
         self.kill()
+
+    def health_bar(self, surf):
+        pg.draw.rect(surf, (255, 0, 0), [SCREEN_WIDTH - 50, 40, 20, 500])
+        pg.draw.rect(surf, (0, 0, 0), [SCREEN_WIDTH - 50, 40, 20, 500 - int(self.HEALTH / 2)])
+        pg.draw.rect(surf, WHITE, [SCREEN_WIDTH - 50, 40, 20, 500], 5)
 
 
 class GameControl:
@@ -333,6 +396,7 @@ class GameControl:
         self.font = None
         self._is_running = True
         self.started = True
+        self.boss_defeated = False
         self.start_time = 0
         self.gametime = 0
         self.FPS = 60
@@ -420,28 +484,29 @@ class GameControl:
         if self.player_lives <= 0:
             self._is_running = False
 
-        if self._is_running and self.gametime > 8:
-            if len(self.cruiser) < 1 and self.KILL_COUNT >= 120:
-                snd.play_song("deadly_opposition.ogg")
-                big_enemy = EnemyCruiser()
-                self.cruiser.add(big_enemy)
-                self.enemies.add(self.cruiser)
+        if self._is_running and self.gametime > 10:
+            if not self.boss_defeated and not self.player.dead:
+                if len(self.cruiser) < 1 and self.KILL_COUNT >= 1:
+                    snd.play_song("deadly_opposition.ogg")
+                    big_enemy = EnemyCruiser()
+                    self.cruiser.add(big_enemy)
+                    self.enemies.add(self.cruiser)
 
-            if not self.player.dead and len(self.fighters) < self.MAX_ENEMIES:
-                if len(self.cruiser) == 0:
-                    self.spawn_timer += 1
-                    if self.spawn_timer >= 20:
-                        little_enemy = EnemyFighter()
-                        self.fighters.add(little_enemy)
-                        self.enemies.add(self.fighters)
-                        self.spawn_timer = 0
+                if len(self.fighters) < self.MAX_ENEMIES:
+                    if len(self.cruiser) == 0:
+                        self.spawn_timer += 1
+                        if self.spawn_timer >= 20:
+                            little_enemy = EnemyFighter()
+                            self.fighters.add(little_enemy)
+                            self.enemies.add(self.fighters)
+                            self.spawn_timer = 0
 
-                    if len(self.frigates) < 1:
-                        frigate = EnemyFrigate()
-                        frigate.rect.y = choice([50, 100, 150, 200, 250, 300])
-                        frigate.rect.right = 0
-                        self.frigates.add(frigate)
-                        self.enemies.add(self.frigates)
+                        if len(self.frigates) < 1:
+                            frigate = EnemyFrigate()
+                            frigate.rect.y = choice([50, 100, 150, 200, 250, 300])
+                            frigate.rect.right = 0
+                            self.frigates.add(frigate)
+                            self.enemies.add(self.frigates)
 
             if self.ENEMIES_KILLED > 25:
                 self.MAX_ENEMIES += 1
@@ -463,8 +528,21 @@ class GameControl:
                 self.enemy_bullets.add(frigate.allBullets)
 
             for cruiser in self.cruiser:
+                print(cruiser.HEALTH)
+                if cruiser.HEALTH < 1:
+                    print("DEAD")
+                    self.boss_defeated = True
+                    cruiser.die()
                 if self.player.dead:
                     cruiser.allBullets.empty()
+                # if cruiser.rect.bottom <= self.player.rect.bottom:
+                #     new_bullet = Bullet(cruiser.rect.centerx, cruiser.rect.y, gfx.img_enemy_shot_a)
+                #     if self.player.rect.centerx < cruiser.rect.centerx:
+                #         new_bullet.dx = -10
+                #         cruiser.allBullets.add(new_bullet)
+                #     elif self.player.rect.centerx > cruiser.rect.centerx:
+                #         new_bullet.dx = 10
+                #         cruiser.allBullets.add(new_bullet)
                 self.enemy_bullets.add(cruiser.allBullets)
 
             if not self.player.invulnerable:
@@ -487,7 +565,8 @@ class GameControl:
                         snd.load_sound("hit.wav")
                         enemy.is_hit = True
                         enemy.HEALTH -= 1
-                        bullet.kill()
+                        if self.player.power_level <= 2:
+                            bullet.kill()
                         if enemy.HEALTH <= 0:
                             self.ENEMIES_KILLED += 1
                             self.KILL_COUNT += 1
@@ -528,6 +607,15 @@ class GameControl:
             else:
                 pass
 
+        # Player ship leaves after boss defeated
+        if self.boss_defeated:
+            self.enemy_bullets.empty()
+            self.star_speed = 5
+            self.player.dx = 0
+            self.player.move_up()
+            if self.player.rect.bottom <= 0:
+                self._is_running = False
+
         self.all_sprites.update()
         self.clock.tick(self.FPS)
 
@@ -549,7 +637,14 @@ class GameControl:
         for i in range(self.player_lives):
             self.screen.blit(gfx.img_life, lives[i])
 
+        for boss in self.cruiser:
+            boss.health_bar(self.screen)
+
         self.screen.blit(score, (20, SCREEN_HEIGHT - 50))
+
+        if self.boss_defeated and self.player.rect.y < 100:
+            i = 1 + i
+            self.screen.fill((0,0,0,i))
 
         # Render each sprite
         self.all_sprites.draw(gfx.screen)
@@ -604,14 +699,12 @@ class GameControl:
                 self.screen.blit(gfx.img_title_background, (0, 0))
                 self.screen.blit(gfx.img_title_stars, (0, 100))
                 self.screen.blit(title_a, (10 - title_size[0] + i * 2, 300))
-                self.screen.blit(title_b, (10 + SCREEN_WIDTH - i * 2, 301))
-                helper_functions.scanlines()
+                self.screen.blit(title_b, (10 + SCREEN_WIDTH - i * 2, 300))
                 pg.display.flip()
             snd.load_sound("blow_up.wav")
             for i in range(100):
                 pg.display.update(self.screen.fill(WHITE))
             self.screen.blit(gfx.img_title_background, (0, 0))
-            helper_functions.scanlines()
             snd.play_song("title_song.ogg")
             break
 
@@ -644,7 +737,6 @@ class GameControl:
             if anim >= 100:
                 anim = 0
 
-            helper_functions.scanlines()
             pg.display.update()
 
             e = pg.event.poll()
@@ -690,6 +782,16 @@ class GameControl:
             pg.display.update()
         pg.time.wait(2000)
 
+    def end_message(self):
+        pg.mixer.music.stop()
+        snd.load_sound("music/winning.ogg")
+
+        message = self.font.render("Thanks for playing!", True, WHITE)
+        self.screen.blit(message, SCREEN_CENTER)
+
+        pg.display.flip()
+        pg.time.wait(5000)
+
     def loop(self):
         if self._is_running:
             self.title_screen()
@@ -699,7 +801,11 @@ class GameControl:
                 self.on_event()
                 self.update_loop()
                 self.on_render()
-        self.game_over()
+
+        if self.boss_defeated:
+            self.end_message()
+        else:
+            self.game_over()
 
 
 if __name__ == "__main__":

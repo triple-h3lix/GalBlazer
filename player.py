@@ -20,6 +20,7 @@ class Player(pg.sprite.Sprite):
         self.dx = 0
         self.dy = 0
         self.speed = 8
+        self.dv = 0
         self.rect = self.image.get_rect()
         self.size = (self.rect[2], self.rect[3])
         self.rect.centerx = SCREEN_WIDTH / 2
@@ -34,7 +35,7 @@ class Player(pg.sprite.Sprite):
         self.invulnerable_timer = 0
         self.dead_timer = pg.time.get_ticks()
         self.cool_down = 0
-        self.power_level = 1
+        self.power_level = 3
         self.t = 0
         self.anim_timer = 0
 
@@ -68,15 +69,23 @@ class Player(pg.sprite.Sprite):
 
         if self.moving:
             if not all([self.dead or self.respawn or self.arrive]):
-                for i in range(self.speed):
-                    self.rect.x += self.dx
-                    self.rect.y += self.dy
+                # for i in range(self.speed):
+                #     self.rect.x += self.dx
+                #     self.rect.y += self.dy
+                self.rect.x += round(self.dx * self.dv)
+                self.rect.y += round(self.dy * self.dv)
+                if self.dv < self.speed:
+                    self.dv += 1.005
         else:
-            self.dx = 0
-            self.dy = 0
             if not self.invulnerable:
                 self.image = gfx.img_player
+            self.rect.x += self.dx * self.dv
+            self.rect.y += self.dy * self.dv
 
+            if self.dv > 0:
+                self.dv -= .5
+            else:
+                self.dv = 0
         if self.dead:
             self.rect.y = self.start_position
             self.dead_timer += 1
@@ -150,7 +159,7 @@ class Player(pg.sprite.Sprite):
         if self.rect.bottom < 900:
             self.rect.bottom = 900
             self.dy = 0
-            duration = 3.0
+            duration = 2.0
             current_time = clock()
             if current_time > duration:
                 self.arrive = False
@@ -207,13 +216,13 @@ class Player(pg.sprite.Sprite):
                     load_sound("pewpew2.wav")
                 if self.t > 5:
                     self.t = 0
-            elif self.power_level >= 3 and (pg.time.get_ticks() > self.cool_down + 20):
+            elif self.power_level >= 3 and (pg.time.get_ticks() > self.cool_down + 50):
                 self.t += 1
                 self.cool_down = pg.time.get_ticks()
 
-                new_bullet = main.Bullet(self.rect.centerx - 80, self.rect.y, gfx.img_bullet_3)
+                new_bullet = main.Bullet(self.rect.centerx - 60, self.rect.y, gfx.img_bullet_3)
                 new_bullet.dy = -20
-                new_bullet.image = pg.transform.scale(new_bullet.image, (200, 100))
+                new_bullet.image = pg.transform.scale(new_bullet.image, (150, 100))
 
                 if self.t >= 4:
                     self.allBullets.add(new_bullet)
