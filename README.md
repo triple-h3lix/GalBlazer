@@ -3,7 +3,11 @@
   <h1>GalBlazer</h1>
   
   <h2>Description:</h2>
-  <p>GalBlazer is a vertical scrolling shooter written in Python 3.4 using the Pygame modules.<p>
+  <p>GalBlazer is a vertical scrolling SHOOT-EM-UP with several power-ups that you can obtain, as well as an endless supply of enemies to destroy. As you blow up enemy ships, the numbers will increase each wave.
+
+The art direction and style is based heavily off of retro shooter games from the SNES/TurboGraphix era.
+
+All sprites, music, and sound fx are original creations. The game is programmed in Python using the Pygame libraries (which is essentially an SDL wrapper) and Python 3.4.<p>
   
   Current Version = 0.16.02
   
