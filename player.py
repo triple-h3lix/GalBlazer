@@ -35,7 +35,7 @@ class Player(pg.sprite.Sprite):
         self.invulnerable_timer = 0
         self.dead_timer = pg.time.get_ticks()
         self.cool_down = 0
-        self.power_level = 3
+        self.power_level = 1
         self.t = 0
         self.anim_timer = 0
 

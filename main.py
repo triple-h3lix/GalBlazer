@@ -486,7 +486,7 @@ class GameControl:
 
         if self._is_running and self.gametime > 10:
             if not self.boss_defeated and not self.player.dead:
-                if len(self.cruiser) < 1 and self.KILL_COUNT >= 1:
+                if len(self.cruiser) < 1 and self.KILL_COUNT >= 99:
                     snd.play_song("deadly_opposition.ogg")
                     big_enemy = EnemyCruiser()
                     self.cruiser.add(big_enemy)
